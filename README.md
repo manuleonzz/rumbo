@@ -13,7 +13,7 @@ Este proyecto nació como muestra de que **cualquier persona puede construir una
 - **Modo noche**.
 - **Gamificación real**: XP, niveles, medallas por hitos que de verdad importan (nada de puntos por tocar botones), racha, celebraciones con sonido cuando subes de nivel o cumples tu ahorro semanal.
 - **Onboarding guiado** y un resumen semanal tipo "historia" que te cuenta cómo te fue.
-- Todo se guarda **en tu propio navegador** (localStorage) — no hace falta cuenta ni conexión a internet para usarla.
+- **Cuentas reales con email y contraseña**: tus datos viven en la nube (Supabase) y te siguen entre dispositivos — entra desde el ordenador o el móvil y ves lo mismo.
 
 ## 🛠️ Cómo está hecho
 
@@ -21,7 +21,43 @@ Este proyecto nació como muestra de que **cualquier persona puede construir una
 - [lucide-react](https://lucide.dev/) para los iconos
 - [recharts](https://recharts.org/) para las gráficas
 - Web Audio API para los sonidos (sin archivos de audio externos)
-- `localStorage` a través de una capa de almacenamiento propia (`src/lib/storage.js`), pensada para poder cambiarse en el futuro por una base de datos real (Supabase, Firebase...) sin tocar el resto de la app.
+- [Supabase](https://supabase.com/) para autenticación (email + contraseña) y guardado de datos en la nube, a través de una capa propia (`src/lib/CloudDataContext.jsx` + `usePersistentState.js`) pensada para poder cambiarse por otro proveedor sin tocar el resto de la app.
+
+## 🔑 Configurar Supabase (necesario para que funcione)
+
+1. Crea un proyecto gratuito en [supabase.com](https://supabase.com).
+2. En el **SQL Editor** del proyecto, ejecuta esto una vez para crear la tabla y sus reglas de seguridad:
+
+   ```sql
+   create table if not exists public.user_data (
+     user_id uuid references auth.users(id) on delete cascade not null,
+     key text not null,
+     value jsonb not null,
+     updated_at timestamptz default now(),
+     primary key (user_id, key)
+   );
+
+   alter table public.user_data enable row level security;
+
+   create policy "Los usuarios ven solo sus propios datos"
+     on public.user_data for select using (auth.uid() = user_id);
+   create policy "Los usuarios crean solo sus propios datos"
+     on public.user_data for insert with check (auth.uid() = user_id);
+   create policy "Los usuarios editan solo sus propios datos"
+     on public.user_data for update using (auth.uid() = user_id);
+   create policy "Los usuarios borran solo sus propios datos"
+     on public.user_data for delete using (auth.uid() = user_id);
+   ```
+
+3. En **Project Settings → API Keys**, copia la **Project URL** y la **Publishable key**.
+4. Para desarrollo local: copia `.env.example` como `.env.local` y pega ahí esos dos valores.
+5. Para el sitio ya publicado: en tu repo de GitHub, ve a **Settings → Secrets and variables → Actions** y crea dos *repository secrets*:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+
+   (el flujo de despliegue ya está preparado para leerlos automáticamente en cada build)
+
+> Nota: por defecto, Supabase pide confirmar el email al crear una cuenta. Para pruebas rápidas en familia, puedes desactivarlo en **Authentication → Providers → Email → "Confirm email"**.
 
 ## 🚀 Cómo correrlo en tu máquina
 
@@ -48,14 +84,19 @@ Pasos para activarlo la primera vez:
 ```
 rumbo/
 ├── src/
-│   ├── App.jsx              # toda la lógica y la interfaz de la app
-│   ├── main.jsx             # punto de entrada de React
-│   ├── index.css            # reset mínimo
+│   ├── App.jsx               # toda la lógica y la interfaz de la app
+│   ├── AuthGate.jsx           # pantalla de login/registro y puerta de acceso
+│   ├── main.jsx               # punto de entrada de React
+│   ├── index.css              # reset mínimo
 │   ├── assets/
-│   │   └── monedin.png      # la mascota
+│   │   └── monedin.png        # la mascota
 │   └── lib/
-│       ├── storage.js       # capa de almacenamiento (hoy: localStorage)
-│       └── usePersistentState.js  # hook que guarda el estado automáticamente
+│       ├── supabaseClient.js       # conexión a Supabase
+│       ├── AuthContext.jsx         # sesión de usuario (login/logout)
+│       ├── CloudDataContext.jsx    # caché + sincronización con la nube
+│       └── usePersistentState.js   # hook que guarda el estado automáticamente
+├── public/
+│   └── monedin.png            # favicon
 ├── index.html
 ├── vite.config.js
 ├── package.json
@@ -64,9 +105,9 @@ rumbo/
 
 ## 🗺️ Próximos pasos
 
-- Cuentas de usuario reales (email + contraseña) para usar Rumbo desde varios dispositivos.
 - Diseño específico para móvil.
 - Medallas adicionales y un sistema de rachas comparadas entre familiares (sin mostrar cifras exactas).
+- Recuperar contraseña olvidada (Supabase lo soporta, falta la pantalla).
 
 ## 🤝 Contribuir
 

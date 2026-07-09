@@ -1,19 +1,26 @@
 import { useState, useEffect, useRef } from "react";
-import { getItem, setItem } from "./storage";
+import { useCloudData } from "./CloudDataContext";
 
-// Como useState, pero se guarda solo en localStorage (a través de storage.js)
-// cada vez que cambia, y se recupera al abrir la página de nuevo.
+// Funciona igual que useState para el resto de la app (mismo nombre, misma
+// firma), pero por dentro lee y guarda en Supabase a través de CloudDataContext,
+// para que los datos te sigan entre dispositivos una vez inicias sesión.
+//
+// Importante: esto solo debe usarse dentro de <CloudDataProvider>, que ya
+// se encarga de haber cargado todos los datos del usuario antes de mostrar
+// la app (por eso "cache" ya tiene el valor real la primera vez que se lee).
 export function usePersistentState(key, initialValue) {
-  const [value, setValue] = useState(() => getItem(key, initialValue));
+  const { cache, setKey } = useCloudData();
+  const [value, setValue] = useState(() =>
+    cache && key in cache ? cache[key] : initialValue
+  );
   const primerRender = useRef(true);
 
   useEffect(() => {
-    // Evita escribir de vuelta el mismo valor que acabamos de leer al montar.
     if (primerRender.current) {
       primerRender.current = false;
       return;
     }
-    setItem(key, value);
+    setKey(key, value);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useAuth } from "./lib/AuthContext";
 import {
   Home, MapPin, Zap, Droplet, Tv, ShoppingCart, Phone, Smartphone,
   HeartPulse, Dumbbell, Car, CreditCard, Youtube, Cloud, Bot, Package,
@@ -6,7 +7,7 @@ import {
   PiggyBank, PartyPopper, Target, Wand2, Lock, Moon, Sun,
   ShoppingBag, Coffee, Plane, Bus, Fuel, Scissors, Shirt, Book, Music,
   Film, Gamepad2, Laptop, Wifi, PawPrint, Baby, Wrench, Palette,
-  GraduationCap, Umbrella, Briefcase, Star, Heart, Eye, EyeOff
+  GraduationCap, Umbrella, Briefcase, Star, Heart, Eye, EyeOff, LogOut
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
@@ -242,6 +243,7 @@ function playLevelUpSound() {
 }
 
 export default function RumboApp() {
+  const { signOut, user } = useAuth();
   const [saldoInicial, setSaldoInicial] = usePersistentState("saldoInicial", 2800);
   const [modoOscuro, setModoOscuro] = usePersistentState("modoOscuro", false);
   const [modoSimple, setModoSimple] = usePersistentState("modoSimple", true);
@@ -811,6 +813,17 @@ export default function RumboApp() {
               title={modoOscuro ? "Modo claro" : "Modo noche"}
             >
               {modoOscuro ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            <button
+              className="rumbo-theme-btn"
+              onClick={() => {
+                if (window.confirm("¿Cerrar sesión? Tus datos ya están a salvo, se guardaron en tu cuenta.")) {
+                  signOut();
+                }
+              }}
+              title={`Cerrar sesión (${user?.email || ""})`}
+            >
+              <LogOut size={16} />
             </button>
             <div className="rumbo-streak">
               <Flame size={16} color="#ff9f43" /> {racha} acciones esta semana
