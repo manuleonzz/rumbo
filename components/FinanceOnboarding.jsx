@@ -114,7 +114,7 @@ function calcularPlanDeuda(saldoValor, cuotaValor, taeValor = 0) {
 
 const euros = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 
-export default function FinanceOnboarding({ onComplete, onCancel, settings }) {
+export default function FinanceOnboarding({ onComplete, onCancel, settings, isDemo = true }) {
   const [paso, setPaso] = useState(0);
   const [frecuencia, setFrecuencia] = useState("semanal");
   const [ingreso, setIngreso] = useState("650");
@@ -211,7 +211,7 @@ export default function FinanceOnboarding({ onComplete, onCancel, settings }) {
       <div className="setup-deco setup-deco-a" /><div className="setup-deco setup-deco-b" />
       <header className="setup-header">
         <button type="button" className="setup-logo" onClick={onCancel} aria-label={tr("Volver a la portada de Rumbo", "Return to the Rumbo home page")}><img src={MONEDIN_IMG} alt="" /><b>Rumbo</b></button>
-        <div className="setup-header-actions"><AppControls {...settings} compact /><button onClick={onCancel}><X size={18} /> {tr("Salir de la demo", "Exit demo")}</button></div>
+        <div className="setup-header-actions"><AppControls {...settings} compact /><button onClick={onCancel}>{isDemo ? <X size={18} /> : <ArrowLeft size={18} />} {isDemo ? tr("Salir de la demo", "Exit demo") : tr("Volver a la portada", "Back to home")}</button></div>
       </header>
 
       <main className="setup-shell">

@@ -51,13 +51,20 @@ const landingCopy = {
   },
 };
 
-export default function Landing({ onDemo, settings }) {
+export default function Landing({ onDemo, onAccount, user = null, settings }) {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [menuAbierto, setMenuAbierto] = useState(false);
   const c = landingCopy[settings.language];
+  const authenticated = Boolean(user);
+  const accountLabel = settings.language === "en" ? "My dashboard" : "Mi panel";
+  const openLabel = settings.language === "en" ? "Open Rumbo" : "Abrir Rumbo";
 
   const abrirRegistro = () => {
     setMenuAbierto(false);
+    if (authenticated) {
+      onAccount?.();
+      return;
+    }
     document.getElementById("empezar")?.scrollIntoView({ behavior: "smooth" });
   };
 
@@ -72,8 +79,8 @@ export default function Landing({ onDemo, settings }) {
         <nav className={menuAbierto ? "landing-links abierto" : "landing-links"}>
           <a href="#como-funciona" onClick={() => setMenuAbierto(false)}>{c.how}</a>
           <a href="#codigo-abierto" onClick={() => setMenuAbierto(false)}>{c.open}</a>
-          <button className="landing-link-button" onClick={() => setModalAbierto(true)}>{c.login}</button>
-          <button className="landing-nav-cta" onClick={abrirRegistro}>{c.create}</button>
+          <button className="landing-link-button" onClick={() => authenticated ? onAccount?.() : setModalAbierto(true)}>{authenticated ? accountLabel : c.login}</button>
+          <button className="landing-nav-cta" onClick={abrirRegistro}>{authenticated ? openLabel : c.create}</button>
         </nav>
 
         <AppControls {...settings} />
@@ -95,7 +102,7 @@ export default function Landing({ onDemo, settings }) {
               <button className="landing-primary" onClick={onDemo}>
                 {c.demo} <ArrowRight size={17} />
               </button>
-              <button className="landing-secondary" onClick={abrirRegistro}>{c.createMine}</button>
+              <button className="landing-secondary" onClick={abrirRegistro}>{authenticated ? accountLabel : c.createMine}</button>
             </div>
             <div className="landing-trust">
               <span><CheckCircle2 size={15} /> {c.free}</span>
@@ -185,9 +192,15 @@ export default function Landing({ onDemo, settings }) {
           </div>
           <div className="landing-signup-card">
             <div className="signup-icon"><WalletCards size={22} /></div>
-            <h3>{c.create}</h3>
-            <p>{c.sync}</p>
-            <AuthForm defaultMode="crear" language={settings.language} />
+            {authenticated ? <>
+              <h3>{settings.language === "en" ? "Your session is ready" : "Tu sesión está preparada"}</h3>
+              <p>{settings.language === "en" ? `Signed in as ${user.email}. Continue with your real finances.` : `Has iniciado sesión como ${user.email}. Continúa con tus finanzas reales.`}</p>
+              <button className="landing-account-button" onClick={onAccount}>{openLabel} <ArrowRight size={17} /></button>
+            </> : <>
+              <h3>{c.create}</h3>
+              <p>{c.sync}</p>
+              <AuthForm defaultMode="crear" language={settings.language} />
+            </>}
           </div>
         </section>
       </main>
@@ -198,7 +211,7 @@ export default function Landing({ onDemo, settings }) {
         <span>{c.project}</span>
       </footer>
 
-      {modalAbierto && (
+      {modalAbierto && !authenticated && (
         <div className="landing-modal-backdrop" onMouseDown={() => setModalAbierto(false)}>
           <div className="landing-login-card" onMouseDown={(e) => e.stopPropagation()}>
             <button className="landing-modal-close" onClick={() => setModalAbierto(false)}><X size={18} /></button>

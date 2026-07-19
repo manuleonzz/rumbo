@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Landing from "./Landing";
 import DemoDashboard from "./DemoDashboard";
 import { useAuth } from "../src/lib/AuthContext";
@@ -27,8 +27,8 @@ function ConnectedDashboard({ settings, onHome }) {
 
 export default function PreviewApp() {
   const { user, cargandoSesion } = useAuth();
-  const [demo, setDemo] = useState(false);
-  const [showLanding, setShowLanding] = useState(false);
+  const [screen, setScreen] = useState("landing");
+  const previousUser = useRef(undefined);
   const [theme, setTheme] = useState(() => localStorage.getItem("rumbo-theme") || "light");
   const [language, setLanguage] = useState(() => localStorage.getItem("rumbo-language") || "es");
 
@@ -40,11 +40,14 @@ export default function PreviewApp() {
   }, [theme, language]);
 
   useEffect(() => {
-    if (user) {
-      setDemo(false);
-      setShowLanding(false);
-    }
-  }, [user?.id]);
+    if (cargandoSesion) return;
+    // Una sesión que ya estaba guardada no debe saltarse la portada al abrir
+    // el enlace público. Solo avanzamos automáticamente cuando el usuario
+    // acaba de iniciar sesión desde la propia portada.
+    if (previousUser.current === null && user) setScreen("app");
+    if (previousUser.current && !user) setScreen("landing");
+    previousUser.current = user;
+  }, [cargandoSesion, user?.id]);
 
   const settings = {
     theme,
@@ -54,10 +57,15 @@ export default function PreviewApp() {
   };
 
   if (cargandoSesion) return <LoadingScreen language={language} />;
-  if (demo) return <DemoDashboard onExit={() => setDemo(false)} settings={settings} />;
-  if (user && !showLanding) {
-    return <CloudDataProvider><ConnectedDashboard settings={settings} onHome={() => setShowLanding(true)} /></CloudDataProvider>;
+  if (screen === "demo") return <DemoDashboard onExit={() => setScreen("landing")} settings={settings} />;
+  if (screen === "app" && user) {
+    return <CloudDataProvider><ConnectedDashboard settings={settings} onHome={() => setScreen("landing")} /></CloudDataProvider>;
   }
 
-  return <Landing onDemo={() => setDemo(true)} settings={settings} />;
+  return <Landing
+    onDemo={() => setScreen("demo")}
+    onAccount={() => setScreen("app")}
+    user={user}
+    settings={settings}
+  />;
 }

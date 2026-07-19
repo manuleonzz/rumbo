@@ -176,7 +176,7 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
     setConfigurando(false);
   };
 
-  if (configurando) return <FinanceOnboarding onComplete={completarConfiguracion} onCancel={onExit} settings={settings} />;
+  if (configurando) return <FinanceOnboarding onComplete={completarConfiguracion} onCancel={onExit} settings={settings} isDemo={!cloudData} />;
 
   return (
     <div className="demo-app">
