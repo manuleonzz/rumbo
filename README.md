@@ -6,22 +6,22 @@ Este proyecto nació como muestra de que **cualquier persona puede construir una
 
 ## ✨ Qué hace
 
-- **Presupuesto por categorías**: tú decides cuánto esperas gastar en cada cosa (el "previsto") y luego marcas lo que gastaste de verdad.
-- **Ingresos semanales**: si te pagan cada semana, vas registrando cuánto llega cada vez.
-- **Meta de ahorro mensual**: el día 1 de cada mes, Monedín te pregunta cuánto quieres ahorrar. Cada domingo, registras (o dejas que se calcule solo) cuánto ahorraste esa semana.
-- **Modo Simple**: los números importantes aparecen borrosos por defecto — tócalos para revelarlos. Pensado para no agobiar con cifras a primera vista.
-- **Modo noche**.
-- **Gamificación real**: XP, niveles, medallas por hitos que de verdad importan (nada de puntos por tocar botones), racha, celebraciones con sonido cuando subes de nivel o cumples tu ahorro semanal.
-- **Onboarding guiado** y un resumen semanal tipo "historia" que te cuenta cómo te fue.
-- **Cuentas reales con email y contraseña**: tus datos viven en la nube (Supabase) y te siguen entre dispositivos — entra desde el ordenador o el móvil y ves lo mismo.
+- **Cuestionario financiero interactivo**: adapta el plan a pagos semanales, quincenales, mensuales o variables.
+- **Ingresos flexibles**: permite ajustar cada cobro y registrar bonos o ingresos extraordinarios.
+- **Gastos y movimientos visuales**: categorías por color, buscador, iconos y gráfico circular interactivo.
+- **Presupuestos por categorías**: reparte el dinero con sobres visuales y ajusta límites en tiempo real.
+- **Metas de ahorro**: objetivos a corto, medio y largo plazo, además de ahorro sin fecha.
+- **Control de deudas**: calcula cuotas restantes y una fecha estimada de finalización.
+- **Tema claro y oscuro**, interfaz en **español e inglés** y diseño adaptable a móvil y ordenador.
+- **Cuentas reales con email y contraseña**: los datos se sincronizan mediante Supabase entre dispositivos.
+- **Demo independiente**: permite probar toda la experiencia con datos ficticios sin alterar una cuenta real.
 
 ## 🛠️ Cómo está hecho
 
 - [React](https://react.dev/) + [Vite](https://vitejs.dev/)
 - [lucide-react](https://lucide.dev/) para los iconos
 - [recharts](https://recharts.org/) para las gráficas
-- Web Audio API para los sonidos (sin archivos de audio externos)
-- [Supabase](https://supabase.com/) para autenticación (email + contraseña) y guardado de datos en la nube, a través de una capa propia (`src/lib/CloudDataContext.jsx` + `usePersistentState.js`) pensada para poder cambiarse por otro proveedor sin tocar el resto de la app.
+- [Supabase](https://supabase.com/) para autenticación (email + contraseña) y guardado de datos en la nube, a través de una capa propia (`src/lib/CloudDataContext.jsx`) pensada para poder cambiarse por otro proveedor sin tocar el resto de la app.
 
 ## 🔑 Configurar Supabase (necesario para que funcione)
 
@@ -83,11 +83,10 @@ Pasos para activarlo la primera vez:
 
 ```
 rumbo/
+├── app/                       # estilos de landing, panel, onboarding, móvil y modo oscuro
+├── components/                # nueva interfaz y pantallas financieras
 ├── src/
-│   ├── App.jsx               # toda la lógica y la interfaz de la app
-│   ├── AuthGate.jsx           # pantalla de login/registro y puerta de acceso
 │   ├── main.jsx               # punto de entrada de React
-│   ├── index.css              # reset mínimo
 │   ├── assets/
 │   │   └── monedin.png        # la mascota
 │   └── lib/
@@ -105,9 +104,9 @@ rumbo/
 
 ## 🗺️ Próximos pasos
 
-- Diseño específico para móvil.
-- Medallas adicionales y un sistema de rachas comparadas entre familiares (sin mostrar cifras exactas).
-- Recuperar contraseña olvidada (Supabase lo soporta, falta la pantalla).
+- Recuperación de contraseña desde la propia interfaz.
+- Notificaciones configurables de presupuestos, suscripciones, deudas y metas.
+- Más monedas y formatos regionales.
 
 ## 🤝 Contribuir
 

@@ -1,13 +1,13 @@
 import React from "react";
-import ReactDOM from "react-dom/client";
-import AuthGate from "./AuthGate.jsx";
-import { AuthProvider } from "./lib/AuthContext.jsx";
-import "./index.css";
+import { createRoot } from "react-dom/client";
+import PreviewApp from "../components/PreviewApp";
+import { AuthProvider } from "./lib/AuthContext";
+import "../app/landing.css";
+import "../app/demo-dashboard.css";
+import "../app/onboarding.css";
+import "../app/dark.css";
+import "../app/mobile.css";
 
-ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <AuthProvider>
-      <AuthGate />
-    </AuthProvider>
-  </React.StrictMode>
+createRoot(document.getElementById("root")).render(
+  <React.StrictMode><AuthProvider><PreviewApp /></AuthProvider></React.StrictMode>
 );

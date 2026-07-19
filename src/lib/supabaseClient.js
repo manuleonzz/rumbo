@@ -10,4 +10,7 @@ if (!supabaseUrl || !supabaseKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(
+  supabaseUrl || "https://example.supabase.co",
+  supabaseKey || "public-anon-key-not-configured"
+);

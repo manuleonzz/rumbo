@@ -1,0 +1,189 @@
+/*
+ * Responsive finishing layer.
+ * Loaded last so layout corrections win over page-specific desktop rules.
+ */
+
+html, body, #root { width:100%;min-height:100%; }
+html, body { max-width:100%;overflow-x:hidden; }
+button, input, select { max-width:100%; }
+.landing-v2, .setup-root, .demo-app { min-height:100vh;min-height:100dvh; }
+.demo-main, .demo-content, .demo-summary-grid, .demo-lower-grid, .demo-panel { min-width:0; }
+
+/* The inner disc must always be centred inside every conic chart. */
+.demo-donut, .budget-score, .goals-total-ring { position:relative;isolation:isolate; }
+.demo-donut::before, .budget-score::before, .goals-total-ring::before {
+  top:50%;left:50%;transform:translate(-50%,-50%);
+}
+.demo-donut>div, .budget-score>div, .goals-total-ring>b { position:relative;z-index:1; }
+
+@media (max-width:760px) {
+  /* Dashboard shell and top bar */
+  .demo-sidebar { width:min(246px,calc(100vw - 44px));padding-bottom:max(18px,env(safe-area-inset-bottom)); }
+  .demo-topbar { min-height:68px;height:auto;gap:9px;padding:9px max(12px,env(safe-area-inset-right)) 9px max(12px,env(safe-area-inset-left)); }
+  .demo-search { min-width:0; }
+  .demo-search input { min-width:0; }
+  .demo-top-actions { flex:0 0 auto;gap:5px; }
+  .demo-content { width:100%;padding:22px max(14px,env(safe-area-inset-right)) calc(34px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left)); }
+
+  /* Overview */
+  .demo-page-title { gap:17px;margin-bottom:20px; }
+  .demo-page-title h1 { font-size:25px;line-height:1.15; }
+  .demo-summary-grid, .demo-lower-grid { gap:13px; }
+  .demo-balance-card { min-height:235px;padding:19px 18px 0; }
+  .demo-balance-card>strong { font-size:29px; }
+  .demo-mini-chart { margin-left:-18px;margin-right:-18px; }
+  .demo-stat-stack article { min-height:92px;padding:16px; }
+  .demo-health-card { min-height:235px;padding:19px;overflow:hidden; }
+  .demo-health-card .demo-donut { width:124px;height:124px;margin:20px auto 15px; }
+  .demo-health-card .demo-donut::before { width:92px;height:92px; }
+  .demo-health-card>p { position:relative;z-index:2;max-width:100%;margin:0 auto;line-height:1.45;text-align:center; }
+  .demo-panel { border-radius:16px; }
+  .demo-panel-head { gap:12px; }
+  .demo-panel-head>div { min-width:0; }
+  .demo-panel-head button { flex:0 0 auto; }
+  .demo-category { min-width:0; }
+  .demo-category-info { min-width:0; }
+  .demo-category-info>div:first-child { flex-wrap:wrap;row-gap:3px; }
+  .demo-category-info>div:first-child>span { margin-left:auto;white-space:nowrap; }
+  .demo-tip { align-items:flex-start; }
+
+  /* Page headings and cards */
+  .movements-page-head, .goals-page-head, .debts-page-head, .budget-page-head, .settings-page-head { margin-bottom:19px; }
+  .movements-chart-card, .movements-insights, .all-movements-card,
+  .goal-card, .debt-card, .budget-map-card, .budget-envelopes,
+  .budget-tuner, .budget-rhythm, .budget-monedin-tip, .settings-card { border-radius:16px; }
+  .movements-chart-layout { gap:19px; }
+  .movements-legend>button { min-height:49px; }
+  .all-movement-row { min-width:0; }
+  .goals-summary, .debts-summary { gap:10px; }
+  .goals-summary>article, .debts-summary>article { min-width:0; }
+  .goal-card-top>div, .debt-card-top>div { min-width:0; }
+  .goal-progress-copy, .debt-progress-copy { align-items:flex-start;gap:8px; }
+  .goal-progress-copy>b, .debt-progress-copy>b { max-width:58%; }
+  .budget-map-head { min-width:0; }
+  .budget-map-head>div:first-child { min-width:0; }
+  .budget-envelope { grid-template-columns:42px minmax(0,1fr) auto; }
+
+  /* Modals respect Safari's dynamic viewport. */
+  .demo-modal-backdrop, .income-backdrop, .goal-modal-backdrop, .debt-modal-backdrop, .subscription-backdrop {
+    padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
+  }
+  .demo-modal, .income-modal, .goal-create-modal, .goal-contribution-modal,
+  .debt-create-modal, .debt-payment-modal, .subscription-modal {
+    width:100%;max-height:calc(100dvh - 24px);border-radius:18px;
+  }
+  .demo-category-menu {
+    position:fixed;z-index:110;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));
+    top:auto;bottom:max(12px,env(safe-area-inset-bottom));width:auto;max-height:min(520px,65dvh);overflow:auto;
+  }
+
+  /* Onboarding */
+  .setup-root { padding-bottom:env(safe-area-inset-bottom); }
+  .setup-header { min-height:72px;height:auto;gap:8px;padding:8px max(13px,env(safe-area-inset-right)) 8px max(13px,env(safe-area-inset-left)); }
+  .setup-header-actions { min-width:0;gap:5px; }
+  .setup-header-actions>button { flex:0 0 auto; }
+  .setup-shell { width:min(840px,calc(100% - 24px));margin:18px auto calc(34px + env(safe-area-inset-bottom)); }
+  .setup-monedin-row { min-width:0; }
+  .setup-speech { min-width:0;max-width:none;flex:1; }
+  .setup-card { border-radius:19px; }
+  .setup-footer { gap:10px;padding-bottom:max(16px,env(safe-area-inset-bottom)); }
+  .setup-back, .setup-next { flex:0 0 auto; }
+  .setup-skip { padding:0 10px max(8px,env(safe-area-inset-bottom));line-height:1.4;text-align:center; }
+  .setup-goal-builder, .setup-debt-builder { overflow:hidden; }
+  .subscription-modal>footer { padding-bottom:env(safe-area-inset-bottom); }
+
+  /* Settings */
+  .settings-card { min-width:0;padding:17px; }
+  .settings-profile-row, .settings-sync-state { min-width:0;flex-wrap:wrap; }
+  .settings-profile-row>i, .settings-sync-state>i { margin-left:auto; }
+  .settings-appearance-main .app-language-menu { left:0;right:auto;max-width:calc(100vw - 60px); }
+  .settings-data-action { min-width:0; }
+}
+
+@media (max-width:480px) {
+  /* Header controls remain usable on narrow phones. */
+  .demo-topbar { gap:6px;padding-inline:10px; }
+  .demo-mobile-menu { width:36px;height:36px;flex:0 0 auto; }
+  .demo-search { flex:1 1 52px; }
+  .demo-search svg { flex:0 0 auto; }
+  .demo-preferences .app-controls { gap:4px; }
+  .demo-preferences .app-theme-toggle,
+  .demo-preferences .app-language-toggle { width:35px;height:35px; }
+  .demo-top-actions>button { display:none; }
+  .demo-preferences { gap:3px; }
+
+  /* Overview detail */
+  .demo-title-actions { flex-direction:column; }
+  .demo-title-actions button { width:100%;min-height:43px; }
+  .demo-stat-stack article { min-height:88px; }
+  .demo-health-card { min-height:245px; }
+  .demo-health-card .demo-donut { margin-top:22px;margin-bottom:18px; }
+  .demo-category { display:grid;grid-template-columns:34px minmax(0,1fr) 32px;align-items:center; }
+  .demo-category-icon { grid-row:1; }
+  .demo-category-info>div:first-child { align-items:flex-start;flex-direction:column; }
+  .demo-category-info>div:first-child>span { margin-left:0; }
+  .demo-category>strong { width:auto; }
+
+  /* Transactions */
+  .movements-card-title { gap:8px; }
+  .movements-card-title h2 { font-size:20px; }
+  .movements-donut { max-width:100%; }
+  .all-movement-name { min-width:0; }
+  .all-movement-name>div { min-width:0; }
+
+  /* Goals, debts and budgets */
+  .goals-summary-main, .debts-summary-main { align-items:flex-start;flex-wrap:wrap; }
+  .goals-total-ring { margin-left:auto; }
+  .goal-amount { grid-template-columns:1fr; }
+  .goal-progress-copy, .debt-progress-copy { flex-direction:column; }
+  .goal-progress-copy>b, .debt-progress-copy>b { max-width:100%;text-align:left; }
+  .budget-map-head { align-items:flex-start; }
+  .budget-score { flex:0 0 62px; }
+  .budget-money-map { height:34px; }
+  .budget-envelope { grid-template-columns:40px minmax(0,1fr) auto; }
+  .budget-tuner-buttons { grid-template-columns:1fr; }
+  .budget-tuner-buttons button { min-height:36px; }
+
+  /* Onboarding on small phones */
+  .setup-header>button.setup-logo { font-size:16px; }
+  .setup-logo img { width:32px;height:32px; }
+  .setup-header-actions .app-theme-toggle,
+  .setup-header-actions .app-language-toggle { width:34px;height:34px; }
+  .setup-header-actions .app-language-toggle { padding:0; }
+  .setup-header-actions .app-language-toggle>b,
+  .setup-header-actions .app-language-toggle>svg { display:none; }
+  .setup-step { padding:23px 16px; }
+  .setup-step h1 { overflow-wrap:anywhere;font-size:21px; }
+  .setup-frequency-grid>button { padding:13px; }
+  .setup-expense-grid>label { grid-template-columns:36px minmax(0,1fr) 78px;gap:7px;padding:9px; }
+  .setup-result { flex-wrap:wrap; }
+  .setup-result span { max-width:100%; }
+  .setup-footer { padding-inline:16px; }
+  .setup-next { margin-left:auto; }
+  .subscription-modal { padding:22px 14px; }
+  .subscription-catalog { grid-template-columns:1fr; }
+
+  /* Settings */
+  .settings-health { grid-template-columns:46px minmax(0,1fr);padding:14px; }
+  .settings-health>img { width:45px;height:45px; }
+  .settings-card-title { gap:8px; }
+  .settings-category-row { grid-template-columns:35px minmax(0,1fr); }
+  .settings-colour-picker { overflow-x:auto;width:100%;padding:4px 2px; }
+  .settings-sync-state>i { width:100%;margin:3px 0 0 44px; }
+}
+
+@media (max-width:360px) {
+  .landing-brand { font-size:16px; }
+  .landing-brand-mark { width:34px;height:34px; }
+  .landing-nav>.app-controls { margin-right:3px; }
+  .landing-hero h1 { font-size:38px; }
+  .product-top strong { font-size:29px; }
+  .setup-header>button.setup-logo b { display:none; }
+  .setup-shell { width:calc(100% - 16px); }
+  .demo-content { padding-inline:10px; }
+  .demo-panel, .settings-card { padding:15px 13px; }
+  .demo-card-label { gap:8px; }
+  .demo-balance-card>strong { font-size:26px; }
+  .income-list article { grid-template-columns:32px minmax(0,1fr) 76px;gap:7px; }
+  .budget-period-switch button { padding-inline:6px; }
+}

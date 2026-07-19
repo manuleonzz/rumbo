@@ -1,0 +1,279 @@
+/*
+ * Dark theme finishing layer.
+ * This file is intentionally loaded after every page stylesheet so component
+ * states (selected, warning, disabled, modal, etc.) cannot restore light-mode
+ * colours through source order.
+ */
+
+html[data-theme="dark"] {
+  --dark-page: #0e1824;
+  --dark-panel: #172536;
+  --dark-panel-soft: #111e2c;
+  --dark-field: #101c2a;
+  --dark-border: #304155;
+  --dark-text: #edf3fa;
+  --dark-muted: #9fb0c3;
+}
+
+html[data-theme="dark"] body { background: var(--dark-page); color: var(--dark-text); }
+html[data-theme="dark"] input::placeholder { color: #7f91a5; opacity: 1; }
+
+/* Landing and global controls */
+html[data-theme="dark"] .landing-nav-cta,
+html[data-theme="dark"] .rumbo-auth-form > button,
+html[data-theme="dark"] .setup-next {
+  border-color: #7188f4;
+  background: #5771e5;
+  color: #fff;
+}
+html[data-theme="dark"] .app-language-menu { border-color: var(--dark-border); background: var(--dark-panel); color: var(--dark-text); }
+html[data-theme="dark"] .app-language-menu > button { color: var(--dark-text); }
+html[data-theme="dark"] .app-language-menu > button:hover,
+html[data-theme="dark"] .app-language-menu > button.activo { background: #223349; }
+
+/* Onboarding: structural surfaces */
+html[data-theme="dark"] .setup-root { --ink: var(--dark-text); --muted: var(--dark-muted); background: var(--dark-page); color: var(--dark-text); }
+html[data-theme="dark"] .setup-header { border-color: #293949; background: rgba(15, 26, 39, .94); }
+html[data-theme="dark"] .setup-progress { background: #2b3b4b; }
+html[data-theme="dark"] .setup-card,
+html[data-theme="dark"] .setup-speech,
+html[data-theme="dark"] .subscription-modal { border-color: var(--dark-border); background: var(--dark-panel); color: var(--dark-text); }
+html[data-theme="dark"] .setup-speech::before { border-color: var(--dark-border); background: var(--dark-panel); }
+html[data-theme="dark"] .setup-footer { border-color: #293949; background: var(--dark-panel-soft); }
+
+/* Onboarding: neutral cards and fields */
+html[data-theme="dark"] .setup-frequency-grid > button,
+html[data-theme="dark"] .setup-expense-grid > label,
+html[data-theme="dark"] .setup-services > button,
+html[data-theme="dark"] .setup-goal-types > button,
+html[data-theme="dark"] .setup-debt-answer > button,
+html[data-theme="dark"] .setup-debt-types > button,
+html[data-theme="dark"] .subscription-catalog article,
+html[data-theme="dark"] .subscription-filters button {
+  border-color: var(--dark-border);
+  background: var(--dark-panel-soft);
+  color: var(--dark-text);
+}
+html[data-theme="dark"] .setup-frequency-grid > button > span,
+html[data-theme="dark"] .setup-debt-answer > button > span { background: #253548; color: #c1cedd; }
+html[data-theme="dark"] .setup-money-input,
+html[data-theme="dark"] .setup-expense-input,
+html[data-theme="dark"] .setup-goal-fields input,
+html[data-theme="dark"] .setup-goal-fields > label > div,
+html[data-theme="dark"] .setup-debt-fields input,
+html[data-theme="dark"] .setup-debt-fields label > div,
+html[data-theme="dark"] .subscription-search,
+html[data-theme="dark"] .subscription-catalog article > label,
+html[data-theme="dark"] .subscription-custom input,
+html[data-theme="dark"] .subscription-custom select,
+html[data-theme="dark"] .subscription-custom label {
+  border-color: var(--dark-border);
+  background: var(--dark-field);
+  color: var(--dark-text);
+}
+html[data-theme="dark"] .setup-money-input input,
+html[data-theme="dark"] .setup-expense-input input,
+html[data-theme="dark"] .subscription-search input,
+html[data-theme="dark"] .subscription-catalog article > label input,
+html[data-theme="dark"] .subscription-select { color: var(--dark-text); }
+
+/* Onboarding: active states */
+html[data-theme="dark"] .setup-frequency-grid > button.activo,
+html[data-theme="dark"] .setup-services > button.activo,
+html[data-theme="dark"] .subscription-catalog article.activo,
+html[data-theme="dark"] .subscription-filters button.activo {
+  border-color: #7188f4;
+  background: #233250;
+  color: #f2f5ff;
+  box-shadow: 0 0 0 3px rgba(113, 136, 244, .12);
+}
+html[data-theme="dark"] .setup-frequency-grid > button.activo > span { background: #2c3f6b; color: #aebcff; }
+html[data-theme="dark"] .setup-goal-types > button.activo,
+html[data-theme="dark"] .setup-debt-types > button.activo {
+  border-color: var(--goal-color, var(--debt-color));
+  background: color-mix(in srgb, var(--goal-color, var(--debt-color)) 17%, var(--dark-panel-soft));
+  color: var(--dark-text);
+}
+html[data-theme="dark"] .setup-goal-types > button > span { background: color-mix(in srgb, var(--goal-color) 20%, var(--dark-field)); }
+html[data-theme="dark"] .setup-debt-answer > button.activo.si {
+  border-color: #e56d7a;
+  background: #39222d;
+  color: #ffecef;
+}
+html[data-theme="dark"] .setup-debt-answer > button.activo.si > span { background: #4a2631; color: #ff9da7; }
+html[data-theme="dark"] .setup-debt-answer > button.activo.no {
+  border-color: #35bd98;
+  background: #18352f;
+  color: #e8fff7;
+}
+html[data-theme="dark"] .setup-debt-answer > button.activo.no > span { background: #20483e; color: #74dbbd; }
+html[data-theme="dark"] .setup-debt-answer > button.activo small { color: #b8c9d6; }
+
+/* Onboarding: builders, summaries and semantic messages */
+html[data-theme="dark"] .setup-monthly-preview { background: #222f4c; color: #aebcff; }
+html[data-theme="dark"] .setup-monthly-preview span { color: #a9b6cf; }
+html[data-theme="dark"] .setup-goal-builder,
+html[data-theme="dark"] .setup-debt-builder,
+html[data-theme="dark"] .setup-added-goals,
+html[data-theme="dark"] .setup-added-debts,
+html[data-theme="dark"] .subscription-custom { border-color: var(--dark-border); background: var(--dark-panel-soft); }
+html[data-theme="dark"] .setup-goal-suggestions > button,
+html[data-theme="dark"] .setup-added-goals article { border-color: var(--dark-border); background: var(--dark-panel); color: var(--dark-text); }
+html[data-theme="dark"] .setup-legend > div,
+html[data-theme="dark"] .setup-added-debts > article,
+html[data-theme="dark"] .subscription-modal > footer { border-color: var(--dark-border); }
+html[data-theme="dark"] .setup-donut > div { background: var(--dark-panel); box-shadow: inset 0 0 0 1px var(--dark-border); }
+html[data-theme="dark"] .setup-result,
+html[data-theme="dark"] .setup-debt-free { border-color: #2f6e5d; background: #17332d; color: #7be0c1; }
+html[data-theme="dark"] .setup-debt-free span { color: #a6c9bd; }
+html[data-theme="dark"] .setup-result.negativo { border-color: #78414a; background: #382129; color: #ff9ca6; }
+html[data-theme="dark"] .setup-goal-fields > button:disabled,
+html[data-theme="dark"] .setup-debt-fields > button:disabled,
+html[data-theme="dark"] .setup-next:disabled { background: #344252; color: #8d9baa; box-shadow: none; }
+html[data-theme="dark"] .subscription-close { background: #223246; color: #c9d5e3; }
+html[data-theme="dark"] .setup-added-goals article > button:hover,
+html[data-theme="dark"] .setup-added-debts article > button:hover { background: #3a222a; color: #ff9ca6; }
+
+/* Dashboard: general light surfaces */
+html[data-theme="dark"] .demo-toast,
+html[data-theme="dark"] .income-summary > div,
+html[data-theme="dark"] .income-list article,
+html[data-theme="dark"] .income-extra-btn,
+html[data-theme="dark"] .income-extra-form,
+html[data-theme="dark"] .demo-category-trigger,
+html[data-theme="dark"] .demo-category-menu > section > button,
+html[data-theme="dark"] .movements-legend > button,
+html[data-theme="dark"] .movement-filter-bar button,
+html[data-theme="dark"] .goal-modal-types > button,
+html[data-theme="dark"] .debt-modal-types > button,
+html[data-theme="dark"] .budget-period-switch,
+html[data-theme="dark"] .budget-envelope,
+html[data-theme="dark"] .budget-tuner-buttons button {
+  border-color: var(--dark-border);
+  background: var(--dark-panel-soft);
+  color: var(--dark-text);
+}
+html[data-theme="dark"] .income-extra-form input,
+html[data-theme="dark"] .income-list label,
+html[data-theme="dark"] .goal-create-modal input,
+html[data-theme="dark"] .goal-modal-row label > div,
+html[data-theme="dark"] .goal-contribution-modal > label,
+html[data-theme="dark"] .debt-create-modal input,
+html[data-theme="dark"] .debt-modal-row label > div,
+html[data-theme="dark"] .debt-payment-modal > label {
+  border-color: var(--dark-border);
+  background: var(--dark-field);
+  color: var(--dark-text);
+}
+html[data-theme="dark"] .income-extra-form input,
+html[data-theme="dark"] .income-list input,
+html[data-theme="dark"] .goal-create-modal input,
+html[data-theme="dark"] .goal-contribution-modal input,
+html[data-theme="dark"] .debt-create-modal input,
+html[data-theme="dark"] .debt-payment-modal input { color: var(--dark-text); }
+
+/* Dashboard: selected and hover states */
+html[data-theme="dark"] .demo-category-trigger:hover,
+html[data-theme="dark"] .demo-category-trigger.abierto,
+html[data-theme="dark"] .demo-category-menu > section > button:hover,
+html[data-theme="dark"] .demo-category-menu > section > button.seleccionada,
+html[data-theme="dark"] .movements-legend > button:hover,
+html[data-theme="dark"] .movements-legend > button.activo,
+html[data-theme="dark"] .goal-modal-types > button.activo,
+html[data-theme="dark"] .debt-modal-types > button.activo,
+html[data-theme="dark"] .budget-envelope.activo {
+  background: #233250;
+  color: var(--dark-text);
+}
+html[data-theme="dark"] .budget-period-switch button { color: #aebed0; }
+html[data-theme="dark"] .budget-period-switch button.activo { background: #5771e5; color: #fff; }
+html[data-theme="dark"] .movement-filter-bar button:hover,
+html[data-theme="dark"] .movement-filter-bar button.activo { border-color: #7188f4; background: #233250; color: #b9c5ff; }
+
+/* Dashboard: notices, summaries and chart internals */
+html[data-theme="dark"] .demo-form-error,
+html[data-theme="dark"] .debt-warning,
+html[data-theme="dark"] .debt-plan-preview.warning,
+html[data-theme="dark"] .budget-impact.danger { border-color: #78414a; background: #382129; color: #ff9ca6; }
+html[data-theme="dark"] .demo-toast { border-color: #2f6e5d; background: #17332d; }
+html[data-theme="dark"] .demo-toast b { color: #e8fff7; }
+html[data-theme="dark"] .demo-toast small { color: #a6c9bd; }
+html[data-theme="dark"] .income-context,
+html[data-theme="dark"] .movements-card-title em { background: #223250; color: #aebcff; }
+html[data-theme="dark"] .income-summary .principal { border-color: #2f6e5d; background: #17332d; color: #7be0c1; }
+html[data-theme="dark"] .income-list article.extra { border-color: #6c5836; background: #332b20; }
+html[data-theme="dark"] .movement-insight-tip,
+html[data-theme="dark"] .budget-impact { background: #223326; color: #b7d690; }
+html[data-theme="dark"] .movement-insight-tip b { color: #d9ebbb; }
+html[data-theme="dark"] .movements-legend span,
+html[data-theme="dark"] .movements-legend b,
+html[data-theme="dark"] .all-movement-row > strong,
+html[data-theme="dark"] .movements-empty b { color: var(--dark-text); }
+html[data-theme="dark"] .all-movement-labels { border-color: var(--dark-border); background: var(--dark-panel-soft); color: #9aabbe; }
+html[data-theme="dark"] .movements-donut > div,
+html[data-theme="dark"] .goals-total-ring::before,
+html[data-theme="dark"] .budget-score::before,
+html[data-theme="dark"] .budget-envelope-ring > i { background: var(--dark-panel); }
+html[data-theme="dark"] .budget-map-head p b { color: var(--dark-text); }
+html[data-theme="dark"] .budget-monedin-tip { background: linear-gradient(145deg, #1d2c25, var(--dark-panel)); }
+html[data-theme="dark"] .budget-monedin-tip p { color: #aebda3; }
+html[data-theme="dark"] .demo-tip { border-color: #52653d; background: #223326; }
+html[data-theme="dark"] .demo-tip p { color: #b3c3a3; }
+html[data-theme="dark"] .demo-sidebar nav button i,
+html[data-theme="dark"] .demo-side-close { background: #233246; color: #b7c6d8; }
+html[data-theme="dark"] .demo-modal label { color: #b7c5d5; }
+html[data-theme="dark"] .demo-modal select { border-color: var(--dark-border); background: var(--dark-field); color: var(--dark-text); }
+html[data-theme="dark"] .demo-modal-close { background: #223246; color: #c9d5e3; }
+html[data-theme="dark"] .demo-modal-submit:disabled { background: #344252; color: #8d9baa; }
+html[data-theme="dark"] .demo-card-label,
+html[data-theme="dark"] .demo-health-card>p { color:#a8b8c9; }
+html[data-theme="dark"] .demo-category-info span { color:#aebccd; }
+html[data-theme="dark"] .demo-category-info span small,
+html[data-theme="dark"] .demo-category>strong { color:#8fa1b5; }
+
+/* Dashboard: modal close buttons and disabled actions */
+html[data-theme="dark"] .income-close,
+html[data-theme="dark"] .goal-modal-close,
+html[data-theme="dark"] .debt-modal-close,
+html[data-theme="dark"] .goal-contribution-modal > button:first-child,
+html[data-theme="dark"] .debt-payment-modal > button:first-child { background: #223246; color: #c9d5e3; }
+html[data-theme="dark"] .goal-create-submit:disabled,
+html[data-theme="dark"] .goal-save-contribution:disabled,
+html[data-theme="dark"] .debt-create-submit:disabled,
+html[data-theme="dark"] .debt-save-payment:disabled { background: #344252; color: #8d9baa; }
+
+@media (max-width: 700px) {
+  html[data-theme="dark"] .landing-links.abierto { border-color: var(--dark-border); background: var(--dark-panel); }
+}
+
+/* Centro de ajustes */
+html[data-theme="dark"] .settings-health { border-color:#41563b;background:linear-gradient(115deg,#1d2d25,#172536 62%,#1c2942); }
+html[data-theme="dark"] .settings-health-copy>span { color:#9fc981; }
+html[data-theme="dark"] .settings-health-copy p { color:#aab8a3; }
+html[data-theme="dark"] .settings-health-score>div { background:var(--dark-panel); }
+html[data-theme="dark"] .settings-card { border-color:var(--dark-border);background:var(--dark-panel);color:var(--dark-text); }
+html[data-theme="dark"] .settings-profile-row,
+html[data-theme="dark"] .settings-appearance-main,
+html[data-theme="dark"] .settings-segmented>div,
+html[data-theme="dark"] .settings-category-row,
+html[data-theme="dark"] .settings-inline-action,
+html[data-theme="dark"] .settings-data-action { border-color:var(--dark-border);background:var(--dark-panel-soft);color:var(--dark-text); }
+html[data-theme="dark"] .settings-profile-row>i { background:#17332d;color:#7be0c1; }
+html[data-theme="dark"] .settings-form-grid input,
+html[data-theme="dark"] .settings-select-row select { border-color:var(--dark-border);background:var(--dark-field);color:var(--dark-text); }
+html[data-theme="dark"] .settings-pay-cycle button { border-color:var(--dark-border);background:var(--dark-panel-soft);color:#b8c7d7; }
+html[data-theme="dark"] .settings-pay-cycle button.activo { border-color:#35bd98;background:#18352f;color:#8ce2c8; }
+html[data-theme="dark"] .settings-appearance-main b,
+html[data-theme="dark"] .settings-toggle-row,
+html[data-theme="dark"] .settings-data-action { color:var(--dark-text); }
+html[data-theme="dark"] .settings-segmented button { color:#a9b7c6; }
+html[data-theme="dark"] .settings-segmented button.activo { background:#233250;color:#b9c5ff;box-shadow:none; }
+html[data-theme="dark"] .settings-toggle-row { border-color:#2a3a4a; }
+html[data-theme="dark"] .settings-toggle-row>i { background:#405063; }
+html[data-theme="dark"] .settings-toggle-row>i>em { background:#dce6ef; }
+html[data-theme="dark"] .settings-sync-state { background:#172e3a; }
+html[data-theme="dark"] .settings-sync-state>span { background:#203d4b; }
+html[data-theme="dark"] .settings-privacy-note { background:#223326;color:#b7d690; }
+html[data-theme="dark"] .settings-new-category { background:var(--dark-panel-soft); }
+html[data-theme="dark"] .settings-new-category input { border-color:var(--dark-border);background:var(--dark-field);color:var(--dark-text); }
+html[data-theme="dark"] .settings-new-category button:disabled { background:#344252;color:#8d9baa; }
