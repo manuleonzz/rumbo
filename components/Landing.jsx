@@ -51,13 +51,20 @@ const landingCopy = {
   },
 };
 
-export default function Landing({ onDemo, onAccount, user = null, settings }) {
+export default function Landing({ onDemo, onAccount, onSignOut, user = null, settings }) {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [menuAbierto, setMenuAbierto] = useState(false);
   const c = landingCopy[settings.language];
   const authenticated = Boolean(user);
   const accountLabel = settings.language === "en" ? "My dashboard" : "Mi panel";
   const openLabel = settings.language === "en" ? "Open Rumbo" : "Abrir Rumbo";
+  const logoutLabel = settings.language === "en" ? "Sign out" : "Cerrar sesión";
+
+  const cerrarSesion = async () => {
+    setMenuAbierto(false);
+    setModalAbierto(false);
+    await onSignOut?.();
+  };
 
   const abrirRegistro = () => {
     setMenuAbierto(false);
@@ -79,8 +86,11 @@ export default function Landing({ onDemo, onAccount, user = null, settings }) {
         <nav className={menuAbierto ? "landing-links abierto" : "landing-links"}>
           <a href="#como-funciona" onClick={() => setMenuAbierto(false)}>{c.how}</a>
           <a href="#codigo-abierto" onClick={() => setMenuAbierto(false)}>{c.open}</a>
-          <button className="landing-link-button" onClick={() => authenticated ? onAccount?.() : setModalAbierto(true)}>{authenticated ? accountLabel : c.login}</button>
-          <button className="landing-nav-cta" onClick={abrirRegistro}>{authenticated ? openLabel : c.create}</button>
+          <button className="landing-link-button" onClick={() => setModalAbierto(true)}>{c.login}</button>
+          {authenticated && <button className="landing-link-button landing-account-link" onClick={onAccount}>{accountLabel}</button>}
+          {authenticated
+            ? <button className="landing-nav-logout" onClick={cerrarSesion}>{logoutLabel}</button>
+            : <button className="landing-nav-cta" onClick={abrirRegistro}>{c.create}</button>}
         </nav>
 
         <AppControls {...settings} />
@@ -196,6 +206,7 @@ export default function Landing({ onDemo, onAccount, user = null, settings }) {
               <h3>{settings.language === "en" ? "Your session is ready" : "Tu sesión está preparada"}</h3>
               <p>{settings.language === "en" ? `Signed in as ${user.email}. Continue with your real finances.` : `Has iniciado sesión como ${user.email}. Continúa con tus finanzas reales.`}</p>
               <button className="landing-account-button" onClick={onAccount}>{openLabel} <ArrowRight size={17} /></button>
+              <button className="landing-account-logout" onClick={cerrarSesion}>{logoutLabel}</button>
             </> : <>
               <h3>{c.create}</h3>
               <p>{c.sync}</p>
@@ -211,14 +222,24 @@ export default function Landing({ onDemo, onAccount, user = null, settings }) {
         <span>{c.project}</span>
       </footer>
 
-      {modalAbierto && !authenticated && (
+      {modalAbierto && (
         <div className="landing-modal-backdrop" onMouseDown={() => setModalAbierto(false)}>
           <div className="landing-login-card" onMouseDown={(e) => e.stopPropagation()}>
             <button className="landing-modal-close" onClick={() => setModalAbierto(false)}><X size={18} /></button>
             <img src={MONEDIN_IMG} alt="Monedín" />
-            <h2>{c.welcome}</h2>
-            <p>{c.continue}</p>
-            <AuthForm defaultMode="entrar" language={settings.language} />
+            {authenticated ? <>
+              <span className="landing-session-badge"><i /> {settings.language === "en" ? "Active session" : "Sesión activa"}</span>
+              <h2>{settings.language === "en" ? "You are already signed in" : "Ya has iniciado sesión"}</h2>
+              <p>{settings.language === "en" ? `Connected as ${user.email}` : `Cuenta conectada: ${user.email}`}</p>
+              <div className="landing-session-actions">
+                <button className="landing-account-button" onClick={() => { setModalAbierto(false); onAccount?.(); }}>{accountLabel}</button>
+                <button className="landing-account-logout boxed" onClick={cerrarSesion}>{logoutLabel}</button>
+              </div>
+            </> : <>
+              <h2>{c.welcome}</h2>
+              <p>{c.continue}</p>
+              <AuthForm defaultMode="entrar" language={settings.language} />
+            </>}
           </div>
         </div>
       )}

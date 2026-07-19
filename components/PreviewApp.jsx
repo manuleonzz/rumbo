@@ -26,7 +26,7 @@ function ConnectedDashboard({ settings, onHome }) {
 }
 
 export default function PreviewApp() {
-  const { user, cargandoSesion } = useAuth();
+  const { user, cargandoSesion, signOut } = useAuth();
   const [screen, setScreen] = useState("landing");
   const previousUser = useRef(undefined);
   const [theme, setTheme] = useState(() => localStorage.getItem("rumbo-theme") || "light");
@@ -65,6 +65,7 @@ export default function PreviewApp() {
   return <Landing
     onDemo={() => setScreen("demo")}
     onAccount={() => setScreen("app")}
+    onSignOut={signOut}
     user={user}
     settings={settings}
   />;
