@@ -57,6 +57,11 @@ Este proyecto nació como muestra de que **cualquier persona puede construir una
 
    (el flujo de despliegue ya está preparado para leerlos automáticamente en cada build)
 
+La URL y la clave *publishable* también están configuradas como respaldo público en
+`src/lib/supabaseClient.js`. Las variables anteriores tienen prioridad y permiten
+cambiar de proyecto sin modificar el código. Nunca añadas una clave `service_role`
+o `sb_secret_` al repositorio.
+
 > Nota: por defecto, Supabase pide confirmar el email al crear una cuenta. Para pruebas rápidas en familia, puedes desactivarlo en **Authentication → Providers → Email → "Confirm email"**.
 
 ## 🚀 Cómo correrlo en tu máquina

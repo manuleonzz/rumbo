@@ -19,7 +19,11 @@ export function AuthProvider({ children }) {
     session,
     user: session ? session.user : null,
     cargandoSesion: session === undefined,
-    signUp: (email, password) => supabase.auth.signUp({ email, password }),
+    signUp: (email, password) => supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}` },
+    }),
     signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
     signOut: () => supabase.auth.signOut(),
   };

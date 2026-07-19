@@ -52,10 +52,23 @@ export default function AuthForm({ defaultMode = "entrar", language = "es" }) {
     if (modo === "crear" && password !== password2) return setError(tr("Las dos contraseñas no coinciden.", "The passwords do not match."));
 
     setCargando(true);
-    const { error: authError } = modo === "entrar" ? await signIn(email, password) : await signUp(email, password);
-    setCargando(false);
-    if (authError) return setError(authError.message);
-    if (modo === "crear") setAviso(tr("Cuenta creada. Si se solicita confirmación, revisa tu correo.", "Account created. Check your email if confirmation is required."));
+    try {
+      const { error: authError } = modo === "entrar" ? await signIn(email, password) : await signUp(email, password);
+      if (authError) {
+        const mensajeConexion = tr(
+          "No se pudo conectar con Supabase. Comprueba tu conexión e inténtalo de nuevo.",
+          "Rumbo could not connect to Supabase. Check your connection and try again."
+        );
+        return setError(authError.message === "Failed to fetch" ? mensajeConexion : authError.message);
+      }
+      if (modo === "crear") setAviso(tr("Cuenta creada. Si se solicita confirmación, revisa tu correo.", "Account created. Check your email if confirmation is required."));
+    } catch (authError) {
+      setError(authError?.message === "Failed to fetch"
+        ? tr("No se pudo conectar con Supabase. Comprueba tu conexión e inténtalo de nuevo.", "Rumbo could not connect to Supabase. Check your connection and try again.")
+        : tr("Ha ocurrido un error inesperado. Inténtalo de nuevo.", "An unexpected error occurred. Please try again."));
+    } finally {
+      setCargando(false);
+    }
   };
 
   const requisitos = [
