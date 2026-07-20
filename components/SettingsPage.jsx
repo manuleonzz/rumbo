@@ -26,6 +26,7 @@ import {
   ShoppingBasket,
   Sparkles,
   Tags,
+  Trash2,
   UserRound,
   Utensils,
   WalletCards,
@@ -62,6 +63,20 @@ export default function SettingsPage({ language, settings, frecuencia, onFrecuen
   const actualizarColor = (id, color) => {
     onCategorias(categorias.map((categoria) => categoria.id === id ? { ...categoria, color } : categoria));
     avisar(tr("Color de categoría actualizado", "Category colour updated"));
+  };
+
+  const eliminarCategoria = (categoria) => {
+    if (categorias.length <= 1) {
+      avisar(tr("Necesitas conservar al menos una categoría", "You need to keep at least one category"));
+      return;
+    }
+    const confirmado = window.confirm(tr(
+      `¿Quitar “${categoria.nombre}” de tus gastos previstos? Los movimientos antiguos conservarán su nombre y su importe en el historial.`,
+      `Remove “${categoria.nombre}” from your planned expenses? Older transactions will keep their name and amount in your history.`,
+    ));
+    if (!confirmado) return;
+    onCategorias(categorias.filter((item) => item.id !== categoria.id));
+    avisar(tr("Categoría eliminada del próximo presupuesto", "Category removed from the next budget"));
   };
 
   const exportar = () => {
@@ -145,7 +160,15 @@ export default function SettingsPage({ language, settings, frecuencia, onFrecuen
 
       <article className="settings-card settings-categories-card">
         <SettingsCardTitle icon={Tags} color="#e56d7a" eyebrow={tr("CATEGORÍAS", "CATEGORIES")} title={tr("Tus colores, tus reglas", "Your colours, your rules")} description={tr("Cambia el color de cada categoría y verás el resultado en todos los gráficos.", "Change each category colour and see it across every chart.")} />
-        <div className="settings-category-grid">{categorias.map((categoria) => { const Icono = iconos[categoria.id] || CircleHelp; return <div className="settings-category-row" key={categoria.id}><span style={{ color: categoria.color, background: `${categoria.color}1f` }}><Icono size={18} /></span><div><b>{categoria.nombre}</b><small>{tr("Presupuesto", "Budget")} · {categoria.limite} €</small></div><div className="settings-colour-picker">{colores.slice(0, 6).map((color) => <button key={color} aria-label={`${tr("Cambiar a", "Change to")} ${color}`} className={categoria.color === color ? "activo" : ""} style={{ background: color, "--swatch": color }} onClick={() => actualizarColor(categoria.id, color)}>{categoria.color === color && <Check size={10} />}</button>)}</div></div>; })}</div>
+        <div className="settings-category-grid">{categorias.map((categoria) => {
+          const Icono = iconos[categoria.id] || CircleHelp;
+          return <div className="settings-category-row" key={categoria.id}>
+            <span style={{ color: categoria.color, background: `${categoria.color}1f` }}><Icono size={18} /></span>
+            <div><b>{categoria.nombre}</b><small>{tr("Presupuesto", "Budget")} · {categoria.limite} €</small></div>
+            <div className="settings-colour-picker">{colores.slice(0, 6).map((color) => <button type="button" key={color} aria-label={`${tr("Cambiar a", "Change to")} ${color}`} className={categoria.color === color ? "activo" : ""} style={{ background: color, "--swatch": color }} onClick={() => actualizarColor(categoria.id, color)}>{categoria.color === color && <Check size={10} />}</button>)}</div>
+            <button type="button" className="settings-category-delete" aria-label={`${tr("Eliminar", "Remove")} ${categoria.nombre}`} title={tr("Quitar de los gastos previstos", "Remove from planned expenses")} onClick={() => eliminarCategoria(categoria)}><Trash2 size={15} /></button>
+          </div>;
+        })}</div>
         {creandoCategoria ? <form className="settings-new-category" onSubmit={crearCategoria}><input autoFocus value={nombreCategoria} onChange={(e) => setNombreCategoria(e.target.value)} placeholder={tr("Nombre de la categoría", "Category name")} /><button disabled={!nombreCategoria.trim()}><Check size={14} /> {tr("Crear", "Create")}</button><button type="button" onClick={() => { setCreandoCategoria(false); setNombreCategoria(""); }}>{tr("Cancelar", "Cancel")}</button></form> : <button className="settings-inline-action" onClick={() => setCreandoCategoria(true)}><Sparkles size={14} /> {tr("Crear una categoría personalizada", "Create a custom category")} <ChevronRight size={15} /></button>}
       </article>
 

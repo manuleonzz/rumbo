@@ -285,4 +285,6 @@ html[data-theme="dark"] .setup-debt-types>button.activo { background:#223250;col
 .rumbo-loading-mark { width:52px;height:52px;display:grid;place-items:center;border-radius:17px;background:linear-gradient(135deg,#5771e5,#7e92f0);box-shadow:0 14px 32px rgba(87,113,229,.25);color:#fff;font-size:24px;font-weight:800; }
 .rumbo-loading b { font-size:20px; }.rumbo-loading small { color:#738296; }
 html[data-theme="dark"] .rumbo-loading { background:#0d1926;color:#edf3fa; }
+.rumbo-sync-error { padding:24px;text-align:center; }.rumbo-sync-error small { max-width:430px;line-height:1.55; }.rumbo-sync-error>div { display:flex;gap:9px;margin-top:8px; }.rumbo-sync-error button { min-height:40px;padding:0 15px;border:1px solid #dce3df;border-radius:10px;background:#fff;color:#526177;font-weight:800; }.rumbo-sync-error button:first-child { border-color:#5771e5;background:#5771e5;color:#fff; }
+html[data-theme="dark"] .rumbo-sync-error button { border-color:#34485c;background:#172536;color:#dce7f2; } html[data-theme="dark"] .rumbo-sync-error button:first-child { border-color:#7188f4;background:#5771e5;color:#fff; }
 .rumbo-auth-form>button:disabled { cursor:wait;opacity:.7; }

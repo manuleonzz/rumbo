@@ -167,8 +167,9 @@ button, input, select { max-width:100%; }
   .settings-health { grid-template-columns:46px minmax(0,1fr);padding:14px; }
   .settings-health>img { width:45px;height:45px; }
   .settings-card-title { gap:8px; }
-  .settings-category-row { grid-template-columns:35px minmax(0,1fr); }
+  .settings-category-row { grid-template-columns:35px minmax(0,1fr) 32px; }
   .settings-colour-picker { overflow-x:auto;width:100%;padding:4px 2px; }
+  .settings-category-delete { grid-column:3;grid-row:1; }
   .settings-sync-state>i { width:100%;margin:3px 0 0 44px; }
 }
 

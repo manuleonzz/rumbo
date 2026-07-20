@@ -23,7 +23,7 @@ const landingCopy = {
     how: "Cómo funciona", open: "Código abierto", login: "Iniciar sesión", create: "Crear cuenta",
     kicker: "Finanzas personales, sin complicaciones", titleA: "Tu dinero necesita un ", titleB: "rumbo", titleC: ", no otra tabla.",
     intro: "Planifica tu mes, registra lo que gastas y descubre cuánto puedes ahorrar. Todo en una experiencia sencilla que sí apetece usar.", demo: "Probar la demo", createMine: "Crear mi cuenta", free: "Gratis", noCard: "Sin tarjeta",
-    good: "¡Buen trabajo!", ahead: "Este mes vas por delante de tu meta.", available: "DISPONIBLE ESTE MES", month: "Julio", income: "Ingresos", expenses: "Gastos", saving: "Ahorro", budgetUsed: "Presupuesto usado",
+    good: "¡Buen trabajo!", ahead: "Este mes vas por delante de tu meta.", available: "DISPONIBLE ESTE MES", income: "Ingresos", expenses: "Gastos", saving: "Ahorro", budgetUsed: "Presupuesto usado",
     kinder: "UNA FORMA MÁS AMABLE DE ORGANIZARTE", minute: "para actualizar tu semana", openFree: "gratuito y abierto", onePlace: "para todo tu mes",
     real: "HECHO PARA LA VIDA REAL", less: "Menos tiempo apuntando.", clarity: "Más claridad para decidir.", loose: "Rumbo convierte números sueltos en respuestas fáciles de entender.",
     benefits: [
@@ -38,7 +38,7 @@ const landingCopy = {
     how: "How it works", open: "Open source", login: "Sign in", create: "Create account",
     kicker: "Personal finance, made simple", titleA: "Your money needs a ", titleB: "direction", titleC: ", not another spreadsheet.",
     intro: "Plan your month, record your spending and discover how much you can save. All in a simple experience you'll actually enjoy using.", demo: "Try the demo", createMine: "Create my account", free: "Free", noCard: "No card required",
-    good: "Great job!", ahead: "You are ahead of your goal this month.", available: "AVAILABLE THIS MONTH", month: "July", income: "Income", expenses: "Expenses", saving: "Savings", budgetUsed: "Budget used",
+    good: "Great job!", ahead: "You are ahead of your goal this month.", available: "AVAILABLE THIS MONTH", income: "Income", expenses: "Expenses", saving: "Savings", budgetUsed: "Budget used",
     kinder: "A KINDER WAY TO GET ORGANISED", minute: "to update your week", openFree: "free and open", onePlace: "for your whole month",
     real: "BUILT FOR REAL LIFE", less: "Less time entering numbers.", clarity: "More clarity to decide.", loose: "Rumbo turns scattered numbers into answers that are easy to understand.",
     benefits: [
@@ -59,6 +59,8 @@ export default function Landing({ onDemo, onAccount, onSignOut, user = null, set
   const accountLabel = settings.language === "en" ? "My dashboard" : "Mi panel";
   const openLabel = settings.language === "en" ? "Open Rumbo" : "Abrir Rumbo";
   const logoutLabel = settings.language === "en" ? "Sign out" : "Cerrar sesión";
+  const currentMonth = new Intl.DateTimeFormat(settings.language === "en" ? "en-GB" : "es-ES", { month: "long" }).format(new Date());
+  const currentMonthLabel = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
 
   const cerrarSesion = async () => {
     setMenuAbierto(false);
@@ -132,7 +134,7 @@ export default function Landing({ onDemo, onAccount, onSignOut, user = null, set
                   <span className="product-eyebrow">{c.available}</span>
                   <strong>€1.284,50</strong>
                 </div>
-                <span className="product-chip">{c.month}</span>
+                <span className="product-chip">{currentMonthLabel}</span>
               </div>
               <div className="product-stats">
                 <div><span>{c.income}</span><b className="positive">+ €2.640</b></div>

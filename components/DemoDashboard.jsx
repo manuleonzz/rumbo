@@ -1,18 +1,22 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import FinanceOnboarding from "./FinanceOnboarding";
 import IncomeManager from "./IncomeManager";
 import AppControls from "./AppControls";
 import SettingsPage from "./SettingsPage";
+import { crearCobrosDelPeriodo, desplazarPeriodo, etiquetaPeriodo, fechaEnPeriodo, fechaLocalISO, formatearFecha, normalizarFechaMovimiento, periodoActual, periodoDeFecha } from "../src/lib/monthly";
 import {
   ArrowDownRight,
   ArrowLeft,
   ArrowUpRight,
   BarChart3,
   Bell,
+  CalendarDays,
   Car,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CircleHelp,
   Coffee,
   CreditCard,
@@ -51,16 +55,88 @@ const categoriasIniciales = [
   { id: "ocio", nombre: "Ocio", usado: 126.5, limite: 220, color: "#e56d7a" },
 ];
 
+const periodoDemo = periodoActual();
 const movimientosIniciales = [
-  { id: 1, nombre: "Jumbo", categoria: "comida", fecha: "Hoy, 18:42", importe: 42.8 },
-  { id: 2, nombre: "Shell", categoria: "transporte", fecha: "Ayer, 16:10", importe: 58.2 },
-  { id: 3, nombre: "Alquiler", categoria: "hogar", fecha: "15 jul", importe: 617 },
-  { id: 4, nombre: "Café y brunch", categoria: "restaurantes", fecha: "13 jul", importe: 27.5 },
-  { id: 5, nombre: "Vue Cinema", categoria: "entretenimiento", fecha: "12 jul", importe: 32 },
-  { id: 6, nombre: "Netflix", categoria: "suscripciones", fecha: "10 jul", importe: 13.99 },
-  { id: 7, nombre: "Ziggo", categoria: "electricidad", fecha: "8 jul", importe: 23.75 },
-  { id: 8, nombre: "H&M", categoria: "ropa", fecha: "6 jul", importe: 49.9 },
+  { id: 1, nombre: "Jumbo", categoria: "comida", fechaISO: fechaEnPeriodo(periodoDemo, 20), importe: 42.8 },
+  { id: 2, nombre: "Shell", categoria: "transporte", fechaISO: fechaEnPeriodo(periodoDemo, 19), importe: 58.2 },
+  { id: 3, nombre: "Alquiler", categoria: "hogar", fechaISO: fechaEnPeriodo(periodoDemo, 15), importe: 617 },
+  { id: 4, nombre: "Café y brunch", categoria: "restaurantes", fechaISO: fechaEnPeriodo(periodoDemo, 13), importe: 27.5 },
+  { id: 5, nombre: "Vue Cinema", categoria: "entretenimiento", fechaISO: fechaEnPeriodo(periodoDemo, 12), importe: 32 },
+  { id: 6, nombre: "Netflix", categoria: "suscripciones", fechaISO: fechaEnPeriodo(periodoDemo, 10), importe: 13.99 },
+  { id: 7, nombre: "Ziggo", categoria: "electricidad", fechaISO: fechaEnPeriodo(periodoDemo, 8), importe: 23.75 },
+  { id: 8, nombre: "H&M", categoria: "ropa", fechaISO: fechaEnPeriodo(periodoDemo, 6), importe: 49.9 },
 ];
+
+const firmasMovimientosDemo = new Set(movimientosIniciales.map((movimiento) =>
+  `${movimiento.id}|${movimiento.nombre}|${movimiento.categoria}|${movimiento.importe}`
+));
+
+function esMovimientoDeEjemplo(movimiento) {
+  return firmasMovimientosDemo.has(`${movimiento.id}|${movimiento.nombre}|${movimiento.categoria}|${movimiento.importe}`);
+}
+
+function limpiarDatosReales(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return {};
+  const limpio = { ...snapshot };
+  const movimientosGuardados = Array.isArray(limpio.movimientos) ? limpio.movimientos : [];
+  const conteniaEjemplos = movimientosGuardados.some(esMovimientoDeEjemplo);
+
+  const movimientosReales = movimientosGuardados
+    .filter((movimiento) => !esMovimientoDeEjemplo(movimiento))
+    .map((movimiento) => ({ ...movimiento, fechaISO: normalizarFechaMovimiento(movimiento) }));
+  limpio.movimientos = movimientosReales;
+
+  if (conteniaEjemplos) {
+    if (Array.isArray(limpio.categorias)) {
+      limpio.categorias = limpio.categorias.map((categoria) => ({
+        ...categoria,
+        usado: movimientosReales
+          .filter((movimiento) => movimiento.categoria === categoria.id)
+          .reduce((total, movimiento) => total + Number(movimiento.importe || 0), 0),
+      }));
+    }
+  }
+
+  if (Array.isArray(limpio.cobros)) {
+    limpio.cobros = limpio.cobros.map((cobro, index) => {
+      const incrementoDemo = (index + 1) * 20;
+      const esImporteDeEjemplo = cobro?.id === `pago-${index + 1}` && Number(cobro.real) === Number(cobro.previsto) + incrementoDemo;
+      return esImporteDeEjemplo ? { ...cobro, real: null } : cobro;
+    });
+  }
+
+  const tieneConfiguracionAnterior =
+    Array.isArray(limpio.categorias) && limpio.categorias.length > 0 &&
+    (Array.isArray(limpio.cobros) || Boolean(limpio.cobrosPorMes) || Boolean(limpio.frecuenciaCobro));
+  if (tieneConfiguracionAnterior) limpio.configurado = true;
+  return limpio;
+}
+
+function prepararCobrosPorMes(snapshot, frecuencia, ingresoPorPago, esDemo = false) {
+  if (snapshot?.cobrosPorMes && typeof snapshot.cobrosPorMes === "object") {
+    return Object.fromEntries(Object.entries(snapshot.cobrosPorMes).map(([periodo, cobros]) => [
+      periodo,
+      Array.isArray(cobros) ? cobros.map((cobro, index) => ({
+        ...cobro,
+        fechaISO: /^\d{4}-\d{2}-\d{2}$/.test(cobro.fechaISO || "") ? cobro.fechaISO : fechaEnPeriodo(periodo, frecuencia === "semanal" ? (index + 1) * 7 : frecuencia === "dos-mes" ? (index ? 30 : 15) : 25),
+      })) : [],
+    ]));
+  }
+  if (Array.isArray(snapshot?.cobros) && snapshot.cobros.length) {
+    const periodo = periodoActual();
+    return { [periodo]: snapshot.cobros.map((cobro, index) => ({
+      ...cobro,
+      id: cobro.extra ? cobro.id : `pago-${periodo}-${index + 1}`,
+      fechaISO: (() => {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(cobro.fechaISO || "")) return cobro.fechaISO;
+        const timestampExtra = cobro.extra ? Number(String(cobro.id || "").replace(/^extra-/, "")) : 0;
+        if (timestampExtra > 1000000000000) return fechaLocalISO(new Date(timestampExtra));
+        return fechaEnPeriodo(periodo, frecuencia === "semanal" ? (index + 1) * 7 : frecuencia === "dos-mes" ? (index ? 30 : 15) : 25);
+      })(),
+    })) };
+  }
+  return esDemo ? { [periodoActual()]: crearCobrosDelPeriodo(frecuencia, ingresoPorPago, periodoActual(), true) } : {};
+}
 
 const euros = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
 
@@ -97,13 +173,20 @@ function calcularPlanDeuda(saldoValor, cuotaValor, taeValor = 0) {
 }
 
 export default function DemoDashboard({ onExit, settings, cloudData = null, user = null, onSignOut = null }) {
-  const snapshot = cloudData?.cache?.rumbo_v2 || {};
+  const esCuentaReal = Boolean(cloudData);
+  const snapshot = esCuentaReal ? limpiarDatosReales(cloudData?.cache?.rumbo_v2 || {}) : {};
+  const periodoInicial = periodoActual();
+  const ultimoPeriodoConocido = useRef(periodoInicial);
+  const frecuenciaInicial = snapshot.frecuenciaCobro || "semanal";
+  const ingresoInicial = Number(snapshot.ingresoPorPago ?? snapshot.cobros?.find((cobro) => !cobro.extra)?.previsto ?? 650);
   const [configurando, setConfigurando] = useState(!snapshot.configurado);
-  const [frecuenciaCobro, setFrecuenciaCobro] = useState(snapshot.frecuenciaCobro || "semanal");
-  const [cobros, setCobros] = useState(Array.isArray(snapshot.cobros) ? snapshot.cobros : []);
+  const [periodoActivo, setPeriodoActivo] = useState(periodoInicial);
+  const [frecuenciaCobro, setFrecuenciaCobro] = useState(frecuenciaInicial);
+  const [ingresoPorPago, setIngresoPorPago] = useState(ingresoInicial);
+  const [cobrosPorMes, setCobrosPorMes] = useState(() => prepararCobrosPorMes(snapshot, frecuenciaInicial, ingresoInicial, !esCuentaReal));
   const [ingresosAbiertos, setIngresosAbiertos] = useState(false);
-  const [categorias, setCategorias] = useState(Array.isArray(snapshot.categorias) && snapshot.categorias.length ? snapshot.categorias : categoriasIniciales);
-  const [movimientos, setMovimientos] = useState(Array.isArray(snapshot.movimientos) && snapshot.movimientos.length ? snapshot.movimientos : movimientosIniciales);
+  const [categorias, setCategorias] = useState(() => (Array.isArray(snapshot.categorias) && snapshot.categorias.length ? snapshot.categorias : categoriasIniciales).map((categoria) => ({ ...categoria, usado: 0 })));
+  const [movimientos, setMovimientos] = useState(() => (Array.isArray(snapshot.movimientos) ? snapshot.movimientos : esCuentaReal ? [] : movimientosIniciales).map((movimiento) => ({ ...movimiento, fechaISO: normalizarFechaMovimiento(movimiento) })));
   const [metas, setMetas] = useState(Array.isArray(snapshot.metas) ? snapshot.metas : []);
   const [metaModal, setMetaModal] = useState(false);
   const [deudas, setDeudas] = useState(Array.isArray(snapshot.deudas) ? snapshot.deudas : []);
@@ -115,21 +198,67 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
   const [vista, setVista] = useState("resumen");
   const [menu, setMenu] = useState(false);
   const [busqueda, setBusqueda] = useState("");
-  const [form, setForm] = useState({ nombre: "", importe: "", categoria: "comida" });
+  const [form, setForm] = useState({ nombre: "", importe: "", categoria: "comida", fecha: fechaLocalISO() });
   const tr = (es, en) => settings.language === "en" ? en : es;
 
-  const gastos = useMemo(() => categorias.reduce((total, cat) => total + cat.usado, 0), [categorias]);
+  const movimientosDelPeriodo = useMemo(() => movimientos
+    .filter((movimiento) => periodoDeFecha(movimiento.fechaISO) === periodoActivo)
+    .sort((a, b) => String(b.fechaISO).localeCompare(String(a.fechaISO)) || Number(b.id) - Number(a.id)), [movimientos, periodoActivo]);
+  const categoriasDelPeriodo = useMemo(() => categorias.map((categoria) => ({
+    ...categoria,
+    usado: movimientosDelPeriodo
+      .filter((movimiento) => movimiento.categoria === categoria.id)
+      .reduce((total, movimiento) => total + Number(movimiento.importe || 0), 0),
+  })), [categorias, movimientosDelPeriodo]);
+  const cobros = useMemo(() => cobrosPorMes[periodoActivo] || crearCobrosDelPeriodo(frecuenciaCobro, ingresoPorPago, periodoActivo, !esCuentaReal), [cobrosPorMes, periodoActivo, frecuenciaCobro, ingresoPorPago, esCuentaReal]);
+  const setCobros = (actualizador) => setCobrosPorMes((anteriores) => {
+    const actuales = anteriores[periodoActivo] || crearCobrosDelPeriodo(frecuenciaCobro, ingresoPorPago, periodoActivo, false);
+    const siguientes = typeof actualizador === "function" ? actualizador(actuales) : actualizador;
+    return { ...anteriores, [periodoActivo]: siguientes };
+  });
+  const gastos = useMemo(() => movimientosDelPeriodo.reduce((total, movimiento) => total + Number(movimiento.importe || 0), 0), [movimientosDelPeriodo]);
   const ingresos = useMemo(() => cobros.reduce((total, cobro) => total + (cobro.real === null ? cobro.previsto : cobro.real), 0), [cobros]);
   const disponible = ingresos - gastos;
-  const filtrados = movimientos.filter((m) => m.nombre.toLowerCase().includes(busqueda.toLowerCase()));
-  const categoriaSeleccionada = categorias.find((categoria) => categoria.id === form.categoria) || categorias[0];
+  const filtrados = movimientosDelPeriodo.filter((m) => m.nombre.toLowerCase().includes(busqueda.toLowerCase()));
+  const categoriaSeleccionada = categoriasDelPeriodo.find((categoria) => categoria.id === form.categoria) || categoriasDelPeriodo[0];
+  const presupuestoTotal = categorias.reduce((total, categoria) => total + Number(categoria.limite || 0), 0);
+  const porcentajePresupuesto = presupuestoTotal ? Math.min(100, Math.round((gastos / presupuestoTotal) * 100)) : 0;
+  const etiquetaMes = etiquetaPeriodo(periodoActivo, settings.language);
+  const nombreUsuario = user?.user_metadata?.name || user?.email?.split("@")[0] || "Manuel";
+  const horaActual = new Date().getHours();
+  const saludo = horaActual < 12 ? tr("Buenos días", "Good morning") : horaActual < 19 ? tr("Buenas tardes", "Good afternoon") : tr("Buenas noches", "Good evening");
+  const metaDestacada = metas.find((meta) => Number(meta.objetivo || 0) > 0);
   const importeFormulario = Number(String(form.importe).replace(",", "."));
   const importeValido = Number.isFinite(importeFormulario) && importeFormulario > 0;
 
+  const abrirNuevoGasto = () => {
+    const hoy = fechaLocalISO();
+    const fechaSugerida = periodoActivo === periodoActual() ? hoy : fechaEnPeriodo(periodoActivo, Math.min(new Date().getDate(), 28));
+    setForm((actual) => ({
+      ...actual,
+      categoria: categorias.some((categoria) => categoria.id === actual.categoria) ? actual.categoria : (categorias[0]?.id || ""),
+      fecha: fechaSugerida,
+    }));
+    setModal(true);
+  };
+
   useEffect(() => {
     if (!cloudData || configurando) return;
-    cloudData.setKey("rumbo_v2", { configurado: true, frecuenciaCobro, cobros, categorias, movimientos, metas, deudas });
-  }, [configurando, frecuenciaCobro, cobros, categorias, movimientos, metas, deudas]);
+    cloudData.setKey("rumbo_v2", { versionDatos: 3, configurado: true, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias: categorias.map((categoria) => ({ ...categoria, usado: 0 })), movimientos, metas, deudas });
+  }, [configurando, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias, movimientos, metas, deudas]);
+
+  useEffect(() => {
+    const comprobarCambioDeMes = () => {
+      const nuevoPeriodo = periodoActual();
+      const anterior = ultimoPeriodoConocido.current;
+      if (nuevoPeriodo !== anterior) {
+        setPeriodoActivo((activo) => activo === anterior ? nuevoPeriodo : activo);
+        ultimoPeriodoConocido.current = nuevoPeriodo;
+      }
+    };
+    const intervalo = window.setInterval(comprobarCambioDeMes, 60000);
+    return () => window.clearInterval(intervalo);
+  }, []);
 
   const guardarMovimiento = (e) => {
     e.preventDefault();
@@ -142,37 +271,59 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
       setFormError("Introduce un importe mayor que 0 €. Puedes usar coma o punto.");
       return;
     }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.fecha || "")) {
+      setFormError("Selecciona una fecha válida para el gasto.");
+      return;
+    }
+    if (form.fecha > fechaLocalISO()) {
+      setFormError("La fecha del gasto no puede estar en el futuro.");
+      return;
+    }
+    if (!categorias.some((categoria) => categoria.id === form.categoria)) {
+      setFormError(tr("Selecciona una categoría válida.", "Select a valid category."));
+      return;
+    }
     setFormError("");
     setMovimientos((actuales) => [
-      { id: Date.now(), nombre: form.nombre.trim(), categoria: form.categoria, fecha: "Ahora", importe },
+      { id: Date.now(), nombre: form.nombre.trim(), categoria: form.categoria, fechaISO: form.fecha, importe },
       ...actuales,
     ]);
-    setCategorias((actuales) => actuales.map((c) => c.id === form.categoria ? { ...c, usado: c.usado + importe } : c));
-    setForm({ nombre: "", importe: "", categoria: "comida" });
+    setPeriodoActivo(periodoDeFecha(form.fecha));
+    setForm({ nombre: "", importe: "", categoria: categorias[0]?.id || "", fecha: fechaLocalISO() });
     setCategoriaMenu(false);
     setModal(false);
     setAviso(`Gasto de ${euros.format(importe)} añadido correctamente`);
     window.setTimeout(() => setAviso(""), 3200);
   };
 
-  const completarConfiguracion = ({ frecuencia, ingresoPorPago, categorias: nuevasCategorias, metas: nuevasMetas = [], deudas: nuevasDeudas = [] }) => {
+  const completarConfiguracion = async ({ frecuencia, ingresoPorPago, categorias: nuevasCategorias, metas: nuevasMetas = [], deudas: nuevasDeudas = [] }) => {
     setFrecuenciaCobro(frecuencia);
-    const cantidad = frecuencia === "semanal" ? 4 : frecuencia === "dos-mes" ? 2 : 1;
-    const fechas = frecuencia === "semanal" ? ["7 jul", "14 jul", "21 jul", "28 jul"] : frecuencia === "dos-mes" ? ["15 jul", "30 jul"] : ["25 jul"];
-    setCobros(Array.from({ length: cantidad }, (_, index) => ({
-      id: `pago-${index + 1}`,
-      label: frecuencia === "semanal" ? `Semana ${index + 1}` : frecuencia === "dos-mes" ? `Pago ${index + 1}` : frecuencia === "variable" ? "Ingreso estimado" : "Salario mensual",
-      fecha: fechas[index],
-      previsto: ingresoPorPago,
-      real: index < Math.min(2, cantidad) ? ingresoPorPago + (index + 1) * 20 : null,
-      extra: false,
-    })));
-    setCategorias(nuevasCategorias.map((categoria, index) => ({
+    setIngresoPorPago(Number(ingresoPorPago || 0));
+    const nuevosCobros = crearCobrosDelPeriodo(frecuencia, ingresoPorPago, periodoActivo, !esCuentaReal);
+    const nuevosCobrosPorMes = { [periodoActivo]: nuevosCobros };
+    const categoriasConfiguradas = nuevasCategorias.map((categoria, index) => ({
       ...categoria,
-      usado: Math.round(categoria.limite * [0.62, 0.48, 0.55, 0.41, 0.36, 0.28, 0.72][index % 7] * 100) / 100,
-    })));
+      usado: esCuentaReal ? 0 : Math.round(categoria.limite * [0.62, 0.48, 0.55, 0.41, 0.36, 0.28, 0.72][index % 7] * 100) / 100,
+    }));
+    const movimientosConfigurados = esCuentaReal ? [] : movimientos;
+    setCobrosPorMes(nuevosCobrosPorMes);
+    setCategorias(categoriasConfiguradas);
+    setMovimientos(movimientosConfigurados);
     setMetas(nuevasMetas);
     setDeudas(nuevasDeudas);
+    if (cloudData) {
+      await cloudData.setKey("rumbo_v2", {
+        versionDatos: 3,
+        configurado: true,
+        frecuenciaCobro: frecuencia,
+        ingresoPorPago: Number(ingresoPorPago || 0),
+        cobrosPorMes: nuevosCobrosPorMes,
+        categorias: categoriasConfiguradas,
+        movimientos: movimientosConfigurados,
+        metas: nuevasMetas,
+        deudas: nuevasDeudas,
+      }, { immediate: true });
+    }
     setConfigurando(false);
   };
 
@@ -192,7 +343,7 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
           <span className="demo-nav-label">{tr("GENERAL", "GENERAL")}</span>
           <button className={vista === "resumen" ? "activo" : ""} onClick={() => { setVista("resumen"); setMenu(false); }}><LayoutDashboard size={18} /> {tr("Resumen", "Overview")}</button>
           <button onClick={() => setIngresosAbiertos(true)}><WalletCards size={18} /> {tr("Ingresos", "Income")}</button>
-          <button className={vista === "movimientos" ? "activo" : ""} onClick={() => { setVista("movimientos"); setMenu(false); }}><CreditCard size={18} /> {tr("Movimientos", "Transactions")} <i>{movimientos.length}</i></button>
+          <button className={vista === "movimientos" ? "activo" : ""} onClick={() => { setVista("movimientos"); setMenu(false); }}><CreditCard size={18} /> {tr("Movimientos", "Transactions")} <i>{movimientosDelPeriodo.length}</i></button>
           <button className={vista === "deudas" ? "activo" : ""} onClick={() => { setVista("deudas"); setMenu(false); }}><WalletCards size={18} /> {tr("Deudas", "Debts")} {deudas.length > 0 && <i>{deudas.length}</i>}</button>
           <button className={vista === "presupuestos" ? "activo" : ""} onClick={() => { setVista("presupuestos"); setMenu(false); }}><BarChart3 size={18} /> {tr("Presupuestos", "Budgets")}</button>
           <button className={vista === "metas" ? "activo" : ""} onClick={() => { setVista("metas"); setMenu(false); }}><Target size={18} /> {tr("Metas", "Goals")} {metas.length > 0 && <i>{metas.length}</i>}</button>
@@ -202,10 +353,8 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
           {onSignOut && <button onClick={() => window.confirm(tr("¿Quieres cerrar sesión? Tus datos ya están guardados.", "Sign out? Your data is already saved.")) && onSignOut()}><LogOut size={18} /> {tr("Cerrar sesión", "Sign out")}</button>}
         </nav>
         <div className="demo-side-goal">
-          <span><Flag size={16} /> {tr("Meta de julio", "July goal")}</span>
-          <b>€280 <small>de €400</small></b>
-          <div><i /></div>
-          <small>{tr("¡Ya llevas el 70%!", "You're already at 70%!")}</small>
+          <span><Flag size={16} /> {metaDestacada ? metaDestacada.nombre : tr("Tus metas", "Your goals")}</span>
+          {metaDestacada ? <><b>{euros.format(metaDestacada.ahorrado || 0)} <small>{tr("de", "of")} {euros.format(metaDestacada.objetivo)}</small></b><div><i style={{ width: `${Math.min(100, (Number(metaDestacada.ahorrado || 0) / Number(metaDestacada.objetivo)) * 100)}%` }} /></div><small>{Math.round((Number(metaDestacada.ahorrado || 0) / Number(metaDestacada.objetivo)) * 100)}% {tr("completado", "complete")}</small></> : <><b>0 <small>{tr("metas activas", "active goals")}</small></b><small>{tr("Crea una meta cuando estés listo.", "Create a goal when you're ready.")}</small></>}
         </div>
         <button className="demo-exit" onClick={onExit}><ArrowLeft size={16} /> {tr("Volver a la portada", "Back to home")}</button>
       </aside>
@@ -216,7 +365,7 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
           <div className="demo-search"><Search size={17} /><input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder={tr("Buscar movimientos...", "Search transactions...")} /></div>
           <div className="demo-top-actions">
             <div className="demo-preferences"><small>{tr("APARIENCIA", "APPEARANCE")}</small><AppControls {...settings} compact /></div>
-            <span className="demo-mode"><Sparkles size={14} /> {cloudData ? tr("Sincronizado", "Synced") : tr("Modo demo", "Demo mode")}</span>
+            <span className={`demo-mode ${cloudData?.error ? "sync-warning" : ""}`}><Sparkles size={14} /> {cloudData ? cloudData.error ? tr("Guardado local", "Saved locally") : tr("Sincronizado", "Synced") : tr("Modo demo", "Demo mode")}</span>
             <button><Bell size={18} /><i /></button>
             <button><Download size={18} /></button>
           </div>
@@ -225,10 +374,12 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
         <div className="demo-content">
           {vista === "movimientos" ? (
             <MovementsPage language={settings.language}
-              movimientos={movimientos}
-              categorias={categorias}
+              movimientos={movimientosDelPeriodo}
+              categorias={categoriasDelPeriodo}
               busqueda={busqueda}
-              onAdd={() => setModal(true)}
+              periodo={periodoActivo}
+              onPeriodo={setPeriodoActivo}
+              onAdd={abrirNuevoGasto}
               onBack={() => setVista("resumen")}
             />
           ) : vista === "metas" ? (
@@ -236,20 +387,20 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
           ) : vista === "deudas" ? (
             <DebtsPage language={settings.language} deudas={deudas} setDeudas={setDeudas} onAdd={() => setDeudaModal(true)} onBack={() => setVista("resumen")} />
           ) : vista === "presupuestos" ? (
-            <BudgetPage language={settings.language} categorias={categorias} setCategorias={setCategorias} ingresos={ingresos} frecuencia={frecuenciaCobro} onBack={() => setVista("resumen")} />
+            <BudgetPage language={settings.language} categorias={categoriasDelPeriodo} setCategorias={setCategorias} ingresos={ingresos} frecuencia={frecuenciaCobro} onBack={() => setVista("resumen")} />
           ) : vista === "ajustes" ? (
             <SettingsPage language={settings.language} settings={settings} frecuencia={frecuenciaCobro} onFrecuencia={setFrecuenciaCobro} categorias={categorias} onCategorias={setCategorias} onBack={() => setVista("resumen")} onNotify={(mensaje) => { setAviso(mensaje); window.setTimeout(() => setAviso(""), 3200); }} user={user} onSignOut={onSignOut} />
           ) : (<>
           <section className="demo-page-title">
-            <div><span>{tr("18 de julio de 2026", "July 18, 2026")}</span><h1>{tr("Buenas tardes, Manuel", "Good afternoon, Manuel")}</h1><p>{tr("Aquí tienes el rumbo de tu dinero este mes.", "Here is the direction of your money this month.")}</p></div>
-            <div className="demo-title-actions"><button className="income" onClick={() => setIngresosAbiertos(true)}><ArrowDownRight size={18} /> {tr("Registrar ingreso", "Add income")}</button><button onClick={() => setModal(true)}><Plus size={18} /> {tr("Añadir gasto", "Add expense")}</button></div>
+            <div><span>{periodoActivo === periodoActual() ? formatearFecha(fechaLocalISO(), settings.language) : etiquetaMes}</span><h1>{saludo}, {nombreUsuario}</h1><p>{tr("Aquí tienes el rumbo de tu dinero en", "Here is the direction of your money in")} {etiquetaMes}.</p></div>
+            <div className="demo-title-tools"><MonthNavigator periodo={periodoActivo} onChange={setPeriodoActivo} language={settings.language} /><div className="demo-title-actions"><button className="income" onClick={() => setIngresosAbiertos(true)}><ArrowDownRight size={18} /> {tr("Registrar ingreso", "Add income")}</button><button onClick={abrirNuevoGasto}><Plus size={18} /> {tr("Añadir gasto", "Add expense")}</button></div></div>
           </section>
 
           <section className="demo-summary-grid">
             <article className="demo-balance-card">
               <div className="demo-card-label"><span>{tr("Dinero disponible", "Available money")}</span><button><MoreHorizontal size={18} /></button></div>
               <strong>{euros.format(disponible)}</strong>
-              <div className="demo-balance-change"><TrendingUp size={15} /> {tr("8,4% mejor que el mes pasado", "8.4% better than last month")}</div>
+              <div className="demo-balance-change"><TrendingUp size={15} /> {tr("Balance del periodo seleccionado", "Balance for the selected period")}</div>
               <div className="demo-mini-chart">
                 <svg viewBox="0 0 480 100" preserveAspectRatio="none" aria-hidden="true">
                   <defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#5771e5" stopOpacity=".28"/><stop offset="1" stopColor="#5771e5" stopOpacity="0"/></linearGradient></defs>
@@ -259,21 +410,21 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
               </div>
             </article>
             <div className="demo-stat-stack">
-              <article><span className="demo-stat-icon income"><ArrowDownRight size={19} /></span><div><small>{tr("Ingresos", "Income")}</small><b>{euros.format(ingresos)}</b><em>+3,2%</em></div></article>
-              <article><span className="demo-stat-icon expense"><ArrowUpRight size={19} /></span><div><small>{tr("Gastos", "Expenses")}</small><b>{euros.format(gastos)}</b><em className="down">−5,1%</em></div></article>
+              <article><span className="demo-stat-icon income"><ArrowDownRight size={19} /></span><div><small>{tr("Ingresos", "Income")}</small><b>{euros.format(ingresos)}</b><em>{tr("Proyección", "Projection")}</em></div></article>
+              <article><span className="demo-stat-icon expense"><ArrowUpRight size={19} /></span><div><small>{tr("Gastos", "Expenses")}</small><b>{euros.format(gastos)}</b><em className="down">{tr("Registrados", "Recorded")}</em></div></article>
             </div>
             <article className="demo-health-card">
               <div className="demo-card-label"><span>{tr("Salud del presupuesto", "Budget health")}</span><button><MoreHorizontal size={18} /></button></div>
-              <div className="demo-donut" style={{ "--pct": `${Math.min(100, Math.round((gastos / 1760) * 100)) * 3.6}deg` }}><div><b>{Math.round((gastos / 1760) * 100)}%</b><small>utilizado</small></div></div>
+              <div className="demo-donut" style={{ "--pct": `${porcentajePresupuesto * 3.6}deg` }}><div><b>{porcentajePresupuesto}%</b><small>{tr("utilizado", "used")}</small></div></div>
               <p><span /> {tr("Vas bien. Mantén este ritmo.", "You're doing well. Keep it up.")}</p>
             </article>
           </section>
 
           <section className="demo-lower-grid">
             <article className="demo-panel demo-budget-panel">
-              <div className="demo-panel-head"><div><h2>{tr("Presupuesto por categoría", "Budget by category")}</h2><p>{tr("Tu progreso durante julio", "Your progress during July")}</p></div><button onClick={() => setVista("movimientos")}>{tr("Ver todos", "View all")} <ArrowRightIcon /></button></div>
+              <div className="demo-panel-head"><div><h2>{tr("Presupuesto por categoría", "Budget by category")}</h2><p>{tr("Tu progreso durante", "Your progress during")} {etiquetaMes}</p></div><button onClick={() => setVista("movimientos")}>{tr("Ver todos", "View all")} <ArrowRightIcon /></button></div>
               <div className="demo-categories">
-                {categorias.map((cat) => {
+                {categoriasDelPeriodo.map((cat) => {
                   const Icono = iconos[cat.id] || Sparkles;
                   const pct = Math.min(100, Math.round((cat.usado / cat.limite) * 100));
                   return <div className="demo-category" key={cat.id}>
@@ -290,13 +441,15 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
               <div className="demo-movement-list">
                 {filtrados.length ? filtrados.slice(0, 5).map((mov) => {
                   const Icono = mov.categoria === "comida" ? Utensils : (iconos[mov.categoria] || CreditCard);
-                  return <div className="demo-movement" key={mov.id}><span><Icono size={18} /></span><div><b>{mov.nombre}</b><small>{mov.fecha}</small></div><strong>−{euros.format(mov.importe)}</strong></div>;
-                }) : <div className="demo-empty">No hay movimientos que coincidan.</div>}
+                  return <div className="demo-movement" key={mov.id}><span><Icono size={18} /></span><div><b>{mov.nombre}</b><small>{formatearFecha(mov.fechaISO, settings.language, { corta: true })}</small></div><strong>−{euros.format(mov.importe)}</strong></div>;
+                }) : <div className="demo-empty">{movimientosDelPeriodo.length
+                  ? tr("No hay movimientos que coincidan con la búsqueda.", "No transactions match your search.")
+                  : tr("Todavía no has registrado ningún gasto.", "You have not recorded any expenses yet.")}</div>}
               </div>
             </article>
           </section>
 
-          <div className="demo-tip"><img src={MONEDIN_IMG} alt="Monedín" /><div><b>{tr("Consejo de Monedín", "Monedín's tip")}</b><p>{tr(`Te quedan ${euros.format((categorias.find((c) => c.id === "comida")?.limite || 0) - (categorias.find((c) => c.id === "comida")?.usado || 0))} en supermercado. Vas mejor que la semana pasada.`, `You have ${euros.format((categorias.find((c) => c.id === "comida")?.limite || 0) - (categorias.find((c) => c.id === "comida")?.usado || 0))} left for groceries. You're doing better than last week.`)}</p></div><button><X size={16} /></button></div>
+          <div className="demo-tip"><img src={MONEDIN_IMG} alt="Monedín" /><div><b>{tr("Consejo de Monedín", "Monedín's tip")}</b><p>{tr(`Te quedan ${euros.format(Math.max(0, (categoriasDelPeriodo.find((c) => c.id === "comida")?.limite || 0) - (categoriasDelPeriodo.find((c) => c.id === "comida")?.usado || 0)))} para supermercado en ${etiquetaMes}.`, `You have ${euros.format(Math.max(0, (categoriasDelPeriodo.find((c) => c.id === "comida")?.limite || 0) - (categoriasDelPeriodo.find((c) => c.id === "comida")?.usado || 0)))} left for groceries in ${etiquetaMes}.`)}</p></div><button><X size={16} /></button></div>
           </>)}
         </div>
       </main>
@@ -321,12 +474,13 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
                 </div>}
               </label>
             </div>
+            <label className="demo-date-field">{tr("Fecha del gasto", "Expense date")}<div><CalendarDays size={17} /><input type="date" max={fechaLocalISO()} value={form.fecha} onChange={(e) => { setForm({ ...form, fecha: e.target.value }); setFormError(""); }} /></div></label>
             {formError && <div className="demo-form-error"><CircleHelp size={15} /> {formError}</div>}
             <button className="demo-modal-submit" type="submit" disabled={!importeValido}>{tr("Añadir gasto", "Add expense")}</button>
           </form>
         </div>
       )}
-      {ingresosAbiertos && <IncomeManager cobros={cobros} setCobros={setCobros} frecuencia={frecuenciaCobro} onClose={() => setIngresosAbiertos(false)} />}
+      {ingresosAbiertos && <IncomeManager cobros={cobros} setCobros={setCobros} frecuencia={frecuenciaCobro} periodo={periodoActivo} language={settings.language} onClose={() => setIngresosAbiertos(false)} />}
       {metaModal && <GoalModal onClose={() => setMetaModal(false)} onSave={(meta) => { setMetas((actuales) => [...actuales, meta]); setMetaModal(false); }} />}
       {deudaModal && <DebtModal onClose={() => setDeudaModal(false)} onSave={(deuda) => { setDeudas((actuales) => [...actuales, deuda]); setDeudaModal(false); }} />}
       {aviso && <div className="demo-toast"><span>✓</span><div><b>Movimiento guardado</b><small>{aviso}</small></div></div>}
@@ -474,7 +628,7 @@ function PiggyBankIcon() {
   return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 5c-1.5-1.2-3.4-2-5.5-2C8.8 3 5 6 5 10c0 1.8.8 3.5 2 4.7V19h3v-2h5v2h3v-4c1.2-.7 2-2 2-3.5V9h-2.2c-.4-.8-.9-1.5-1.6-2.1"/><path d="M8 4 6 2v4M14 7h.01"/></svg>;
 }
 
-function MovementsPage({ movimientos, categorias, busqueda, onAdd, onBack, language }) {
+function MovementsPage({ movimientos, categorias, busqueda, periodo, onPeriodo, onAdd, onBack, language }) {
   const [filtro, setFiltro] = useState("todas");
   const tr = (es, en) => language === "en" ? en : es;
   const mapaCategorias = useMemo(() => Object.fromEntries(categorias.map((categoria) => [categoria.id, categoria])), [categorias]);
@@ -508,8 +662,8 @@ function MovementsPage({ movimientos, categorias, busqueda, onAdd, onBack, langu
 
   return <div className="movements-page">
     <section className="movements-page-head">
-      <div><button onClick={onBack}><ArrowLeft size={15} /> {tr("Volver al resumen", "Back to overview")}</button><span>{tr("TUS FINANZAS DE JULIO", "YOUR JULY FINANCES")}</span><h1>{tr("Todos tus movimientos", "All transactions")}</h1><p>{tr("Descubre de un vistazo dónde se está yendo tu dinero.", "See at a glance where your money is going.")}</p></div>
-      <button className="movements-add" onClick={onAdd}><Plus size={18} /> {tr("Añadir gasto", "Add expense")}</button>
+      <div><button onClick={onBack}><ArrowLeft size={15} /> {tr("Volver al resumen", "Back to overview")}</button><span>{tr("TUS FINANZAS DE", "YOUR FINANCES FOR")} {etiquetaPeriodo(periodo, language).toUpperCase()}</span><h1>{tr("Todos tus movimientos", "All transactions")}</h1><p>{tr("Descubre de un vistazo dónde se está yendo tu dinero.", "See at a glance where your money is going.")}</p></div>
+      <div className="movements-head-actions"><MonthNavigator periodo={periodo} onChange={onPeriodo} language={language} /><button className="movements-add" onClick={onAdd}><Plus size={18} /> {tr("Añadir gasto", "Add expense")}</button></div>
     </section>
 
     <section className="movements-overview">
@@ -552,10 +706,20 @@ function MovementsPage({ movimientos, categorias, busqueda, onAdd, onBack, langu
         return <article className="all-movement-row" key={movimiento.id}>
           <div className="all-movement-name"><span style={{ color: categoria.color, background: `${categoria.color}18` }}><Icono size={19} /></span><div><b>{movimiento.nombre}</b><small>Pago realizado</small></div></div>
           <div className="all-movement-category"><i style={{ background: categoria.color }} />{categoria.nombre}</div>
-          <time>{movimiento.fecha}</time><strong>−{euros.format(movimiento.importe)}</strong>
+          <time dateTime={movimiento.fechaISO}>{formatearFecha(movimiento.fechaISO, language, { corta: true })}</time><strong>−{euros.format(movimiento.importe)}</strong>
         </article>;
-      }) : <div className="movements-empty"><Search size={25} /><b>No encontramos gastos</b><span>Prueba con otra búsqueda o categoría.</span></div>}</div>
+      }) : <div className="movements-empty"><Search size={25} /><b>{movimientos.length ? tr("No encontramos gastos", "No expenses found") : tr("Aún no tienes movimientos", "You have no transactions yet")}</b><span>{movimientos.length ? tr("Prueba con otra búsqueda o categoría.", "Try another search or category.") : tr("Pulsa «Añadir gasto» para registrar el primero.", "Select “Add expense” to record the first one.")}</span></div>}</div>
     </section>
+  </div>;
+}
+
+function MonthNavigator({ periodo, onChange, language }) {
+  const siguiente = desplazarPeriodo(periodo, 1);
+  const puedeAvanzar = siguiente <= periodoActual();
+  return <div className="month-navigator" aria-label={language === "en" ? "Select month" : "Seleccionar mes"}>
+    <button type="button" onClick={() => onChange(desplazarPeriodo(periodo, -1))} aria-label={language === "en" ? "Previous month" : "Mes anterior"}><ChevronLeft size={17} /></button>
+    <span><CalendarDays size={15} /> {etiquetaPeriodo(periodo, language)}</span>
+    <button type="button" disabled={!puedeAvanzar} onClick={() => puedeAvanzar && onChange(siguiente)} aria-label={language === "en" ? "Next month" : "Mes siguiente"}><ChevronRight size={17} /></button>
   </div>;
 }
 

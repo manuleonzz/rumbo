@@ -9,12 +9,17 @@ Este proyecto nació como muestra de que **cualquier persona puede construir una
 - **Cuestionario financiero interactivo**: adapta el plan a pagos semanales, quincenales, mensuales o variables.
 - **Ingresos flexibles**: permite ajustar cada cobro y registrar bonos o ingresos extraordinarios.
 - **Gastos y movimientos visuales**: categorías por color, buscador, iconos y gráfico circular interactivo.
+- **Historial mensual automático**: cada movimiento conserva su fecha real; al cambiar de mes el resumen empieza en cero sin borrar los meses anteriores.
 - **Presupuestos por categorías**: reparte el dinero con sobres visuales y ajusta límites en tiempo real.
 - **Metas de ahorro**: objetivos a corto, medio y largo plazo, además de ahorro sin fecha.
 - **Control de deudas**: calcula cuotas restantes y una fecha estimada de finalización.
 - **Tema claro y oscuro**, interfaz en **español e inglés** y diseño adaptable a móvil y ordenador.
 - **Cuentas reales con email y contraseña**: los datos se sincronizan mediante Supabase entre dispositivos.
 - **Demo independiente**: permite probar toda la experiencia con datos ficticios sin alterar una cuenta real.
+
+Los presupuestos, suscripciones, metas y deudas continúan entre meses. Los gastos
+e ingresos reales se calculan por separado para cada periodo (`AAAA-MM`) y los
+datos antiguos se migran automáticamente al abrir la versión actualizada.
 
 ## 🛠️ Cómo está hecho
 

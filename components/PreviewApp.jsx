@@ -10,11 +10,16 @@ function LoadingScreen({ language = "es" }) {
   return <div className="rumbo-loading"><span className="rumbo-loading-mark">R</span><b>Rumbo</b><small>{language === "en" ? "Preparing your space…" : "Preparando tu espacio…"}</small></div>;
 }
 
+function SyncErrorScreen({ language = "es", onRetry, onHome }) {
+  return <div className="rumbo-loading rumbo-sync-error"><span className="rumbo-loading-mark">!</span><b>{language === "en" ? "We couldn't load your data" : "No pudimos cargar tus datos"}</b><small>{language === "en" ? "Your setup has not been reset. Check the connection and try again." : "Tu configuración no se ha reiniciado. Comprueba la conexión e inténtalo otra vez."}</small><div><button onClick={onRetry}>{language === "en" ? "Try again" : "Reintentar"}</button><button onClick={onHome}>{language === "en" ? "Back to home" : "Volver a la portada"}</button></div></div>;
+}
+
 function ConnectedDashboard({ settings, onHome }) {
   const cloudData = useCloudData();
   const { user, signOut } = useAuth();
 
   if (cloudData.cache === null) return <LoadingScreen language={settings.language} />;
+  if (cloudData.error && !cloudData.cache?.rumbo_v2) return <SyncErrorScreen language={settings.language} onRetry={cloudData.reload} onHome={onHome} />;
 
   return <DemoDashboard
     onExit={onHome}

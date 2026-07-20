@@ -8,7 +8,29 @@ export function CloudDataProvider({ children }) {
   const { user } = useAuth();
   const [cache, setCache] = useState(null); // null = todavía cargando
   const [error, setError] = useState(null);
+  const [reloadToken, setReloadToken] = useState(0);
   const timers = useRef({});
+
+  const localKey = user ? `rumbo-cloud-${user.id}` : null;
+
+  const leerRespaldoLocal = () => {
+    if (!localKey) return {};
+    try {
+      return JSON.parse(localStorage.getItem(localKey) || "{}") || {};
+    } catch {
+      return {};
+    }
+  };
+
+  const guardarRespaldoLocal = (datos) => {
+    if (!localKey) return;
+    try {
+      localStorage.setItem(localKey, JSON.stringify(datos));
+    } catch {
+      // Si el navegador bloquea el almacenamiento local, Supabase sigue siendo
+      // la fuente principal y la aplicación puede continuar normalmente.
+    }
+  };
 
   useEffect(() => {
     let cancelado = false;
@@ -21,42 +43,60 @@ export function CloudDataProvider({ children }) {
       .eq("user_id", user.id)
       .then(({ data, error: err }) => {
         if (cancelado) return;
+        const respaldoLocal = leerRespaldoLocal();
         if (err) {
           setError(err.message);
-          setCache({});
+          setCache(respaldoLocal);
           return;
         }
-        const inicial = {};
+        const inicial = { ...respaldoLocal };
         (data || []).forEach((fila) => {
           inicial[fila.key] = fila.value;
         });
+        guardarRespaldoLocal(inicial);
         setCache(inicial);
       });
 
     return () => {
       cancelado = true;
     };
-  }, [user]);
+  }, [user, reloadToken]);
 
   // Guarda en la nube con un pequeño retraso, para no mandar una petición
   // por cada tecla que se pulsa en un campo numérico.
-  const setKey = (key, value) => {
-    setCache((prev) => ({ ...(prev || {}), [key]: value }));
-    if (!user) return;
+  const guardarEnSupabase = async (key, value) => {
+    if (!user) return null;
+    const { error: err } = await supabase
+      .from("user_data")
+      .upsert({ user_id: user.id, key, value, updated_at: new Date().toISOString() });
+    if (err) {
+      setError(err.message);
+      console.warn(`Rumbo: no se pudo guardar "${key}" en Supabase`, err);
+    } else {
+      setError(null);
+    }
+    return err;
+  };
+
+  const setKey = (key, value, options = {}) => {
+    setCache((prev) => {
+      const siguiente = { ...(prev || {}), [key]: value };
+      guardarRespaldoLocal(siguiente);
+      return siguiente;
+    });
+    if (!user) return Promise.resolve(null);
 
     clearTimeout(timers.current[key]);
-    timers.current[key] = setTimeout(async () => {
-      const { error: err } = await supabase
-        .from("user_data")
-        .upsert({ user_id: user.id, key, value, updated_at: new Date().toISOString() });
-      if (err) {
-        console.warn(`Rumbo: no se pudo guardar "${key}" en Supabase`, err);
-      }
+    if (options.immediate) return guardarEnSupabase(key, value);
+
+    timers.current[key] = setTimeout(() => {
+      guardarEnSupabase(key, value);
     }, 500);
+    return Promise.resolve(null);
   };
 
   return (
-    <CloudDataContext.Provider value={{ cache, setKey, error }}>
+    <CloudDataContext.Provider value={{ cache, setKey, error, reload: () => setReloadToken((token) => token + 1) }}>
       {children}
     </CloudDataContext.Provider>
   );
