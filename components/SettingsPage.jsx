@@ -4,7 +4,9 @@ import React, { useState } from "react";
 import AppControls from "./AppControls";
 import {
   ArrowLeft,
+  Baby,
   BellRing,
+  Briefcase,
   CalendarDays,
   Car,
   Check,
@@ -17,14 +19,19 @@ import {
   Download,
   Eye,
   Film,
+  Gift,
+  GraduationCap,
   Home,
   HeartPulse,
   Monitor,
   LogOut,
+  PawPrint,
   Palette,
+  Plane,
   Save,
   ShieldCheck,
   ShoppingBasket,
+  Scissors,
   Smartphone,
   Sparkles,
   Tags,
@@ -33,6 +40,7 @@ import {
   Utensils,
   WalletCards,
   Wifi,
+  Wrench,
 } from "lucide-react";
 
 const MONEDIN_IMG = `${import.meta.env.BASE_URL}monedin.png`;
@@ -49,6 +57,16 @@ const iconos = {
   telefonia: Smartphone,
   salud: HeartPulse,
   ropa: ShoppingBasket,
+  mascotas: PawPrint,
+  educacion: GraduationCap,
+  viajes: Plane,
+  regalos: Gift,
+  familia: Baby,
+  seguros: ShieldCheck,
+  mantenimiento: Wrench,
+  cuidado_personal: Scissors,
+  trabajo: Briefcase,
+  imprevistos: CircleHelp,
 };
 
 export default function SettingsPage({ language, settings, frecuencia, onFrecuencia, categorias, onCategorias, onBack, onNotify, user = null, onSignOut = null }) {

@@ -6,7 +6,10 @@ import IncomeManager from "./IncomeManager";
 import AppControls from "./AppControls";
 import SettingsPage from "./SettingsPage";
 import { crearCobrosDelPeriodo, desplazarPeriodo, etiquetaPeriodo, fechaEnPeriodo, fechaLocalISO, formatearFecha, normalizarFechaMovimiento, periodoActual, periodoDeFecha } from "../src/lib/monthly";
-import { buscarMovimientoDePago, crearPagosPrevistos, normalizarPagosPrevistos } from "../src/lib/recurring";
+import { actualizarPagoPrevisto, buscarMovimientoDePago, crearPagosPrevistos, eliminarPagoPrevisto, migrarPagosPrevistos, normalizarPagosPrevistos } from "../src/lib/recurring";
+import { crearGraficaBalance } from "../src/lib/balance";
+import { migrarCategoriasRecomendadas } from "../src/lib/categories";
+import { actualizarMovimiento } from "../src/lib/movements";
 import {
   ArrowDownRight,
   ArrowLeft,
@@ -25,17 +28,25 @@ import {
   CreditCard,
   Download,
   Film,
+  Gift,
+  GraduationCap,
   Flag,
+  Briefcase,
+  Baby,
   Home,
   HeartPulse,
   LayoutDashboard,
   LogOut,
   Menu,
   MoreHorizontal,
+  PawPrint,
+  Pencil,
+  Plane,
   Plus,
   Rocket,
   RotateCcw,
   Search,
+  Scissors,
   Settings,
   ShieldCheck,
   ShoppingBasket,
@@ -50,12 +61,21 @@ import {
   Utensils,
   WalletCards,
   Wifi,
+  Wrench,
   X,
 } from "lucide-react";
 
 const MONEDIN_IMG = `${import.meta.env.BASE_URL}monedin.png`;
 
-const iconos = { hogar: Home, electricidad: Wifi, suministros: Wifi, telefonia: Smartphone, salud: HeartPulse, comida: ShoppingBasket, transporte: Car, ocio: Coffee, restaurantes: Utensils, ropa: ShoppingBasket, entretenimiento: Film, suscripciones: CreditCard, deudas: WalletCards };
+const iconos = {
+  hogar: Home, electricidad: Wifi, suministros: Wifi, telefonia: Smartphone,
+  salud: HeartPulse, comida: ShoppingBasket, transporte: Car, ocio: Coffee,
+  restaurantes: Utensils, ropa: ShoppingBasket, entretenimiento: Film,
+  suscripciones: CreditCard, deudas: WalletCards, mascotas: PawPrint,
+  educacion: GraduationCap, viajes: Plane, regalos: Gift, familia: Baby,
+  seguros: ShieldCheck, mantenimiento: Wrench, cuidado_personal: Scissors,
+  trabajo: Briefcase, imprevistos: CircleHelp,
+};
 
 const categoriasIniciales = [
   { id: "hogar", nombre: "Hogar", usado: 617, limite: 700, color: "#5771e5" },
@@ -140,6 +160,32 @@ function limpiarDatosReales(snapshot) {
       limpio.categorias.splice(indiceRestaurantes >= 0 ? indiceRestaurantes : limpio.categorias.length, 0, salud);
     }
     limpio.versionDatos = 6;
+  }
+  if (versionDatos < 7) {
+    const serviciosGuardados = Array.isArray(limpio.servicios) ? limpio.servicios : [];
+    const serviciosRecuperados = serviciosGuardados.length ? serviciosGuardados : (Array.isArray(limpio.pagosPrevistos) ? limpio.pagosPrevistos
+      .filter((pago) => pago?.tipo === "suscripcion" && pago?.categoria === "suscripciones" && !pago?.requiereDesglose && pago?.nombre !== "Suscripciones")
+      .map((pago, index) => ({
+        id: String(pago.id || `suscripcion-recuperada-${index}`).replace(/^suscripcion-/, ""),
+        nombre: pago.nombre,
+        precio: Number(pago.importe || 0),
+        diaCobro: Number(pago.diaCobro || 1),
+        sigla: pago.sigla || String(pago.nombre || "S").slice(0, 2).toUpperCase(),
+        color: pago.color || "#ef7d4f",
+        tipo: "personalizada",
+        activo: true,
+      })) : []);
+    limpio.servicios = serviciosRecuperados.filter((servicio) => servicio?.activo !== false && Number(servicio?.precio) > 0);
+    limpio.pagosPrevistos = normalizarPagosPrevistos(limpio.pagosPrevistos, limpio.categorias || [], limpio.servicios);
+    limpio.versionDatos = 7;
+  }
+  if (versionDatos < 8 && Array.isArray(limpio.categorias)) {
+    limpio.categorias = migrarCategoriasRecomendadas(limpio.categorias);
+    limpio.versionDatos = 8;
+  }
+  if (versionDatos < 9) {
+    limpio.pagosPrevistos = migrarPagosPrevistos(limpio.pagosPrevistos, limpio.categorias || [], limpio.servicios || []);
+    limpio.versionDatos = 9;
   }
   return limpio;
 }
@@ -231,6 +277,7 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
   const [deudas, setDeudas] = useState(Array.isArray(snapshot.deudas) ? snapshot.deudas : []);
   const [deudaModal, setDeudaModal] = useState(false);
   const [modal, setModal] = useState(false);
+  const [movimientoEditando, setMovimientoEditando] = useState(null);
   const [categoriaMenu, setCategoriaMenu] = useState(false);
   const [formError, setFormError] = useState("");
   const [aviso, setAviso] = useState("");
@@ -258,6 +305,11 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
   const gastos = useMemo(() => movimientosDelPeriodo.reduce((total, movimiento) => total + Number(movimiento.importe || 0), 0), [movimientosDelPeriodo]);
   const ingresos = useMemo(() => cobros.reduce((total, cobro) => total + (cobro.real === null ? cobro.previsto : cobro.real), 0), [cobros]);
   const disponible = ingresos - gastos;
+  const graficaBalance = useMemo(() => crearGraficaBalance({
+    periodo: periodoActivo,
+    cobros,
+    movimientos: movimientosDelPeriodo,
+  }), [cobros, movimientosDelPeriodo, periodoActivo]);
   const filtrados = movimientosDelPeriodo.filter((m) => m.nombre.toLowerCase().includes(busqueda.toLowerCase()));
   const categoriaSeleccionada = categoriasDelPeriodo.find((categoria) => categoria.id === form.categoria) || categoriasDelPeriodo[0];
   const presupuestoTotal = categorias.reduce((total, categoria) => total + Number(categoria.limite || 0), 0);
@@ -269,12 +321,11 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
   const metaDestacada = metas.find((meta) => Number(meta.objetivo || 0) > 0);
   const importeFormulario = Number(String(form.importe).replace(",", "."));
   const importeValido = Number.isFinite(importeFormulario) && importeFormulario > 0;
-  const pagosConEstado = useMemo(() => pagosPrevistos.map((pago) => ({
+  const pagosConEstado = useMemo(() => pagosPrevistos.filter((pago) => pago.activo !== false).map((pago) => ({
     ...pago,
     movimiento: buscarMovimientoDePago(pago, movimientos, periodoActivo),
   })), [pagosPrevistos, movimientos, periodoActivo]);
-  const pagosPendientes = pagosConEstado.filter((pago) => !pago.movimiento && !pago.requiereDesglose);
-  const pagosSinDesglosar = pagosConEstado.filter((pago) => pago.requiereDesglose);
+  const pagosPendientes = pagosConEstado.filter((pago) => !pago.movimiento);
   const totalPendiente = pagosPendientes.reduce((total, pago) => total + Number(pago.importe || 0), 0);
   const pagosVisibles = mostrarTodosPagos ? pagosConEstado : pagosConEstado.slice(0, 6);
   const periodoFuturo = periodoActivo > periodoActual();
@@ -282,38 +333,41 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
   const abrirNuevoGasto = () => {
     const hoy = fechaLocalISO();
     const fechaSugerida = periodoActivo === periodoActual() ? hoy : fechaEnPeriodo(periodoActivo, Math.min(new Date().getDate(), 28));
-    setForm((actual) => ({
-      ...actual,
-      categoria: categorias.some((categoria) => categoria.id === actual.categoria) ? actual.categoria : (categorias[0]?.id || ""),
+    setMovimientoEditando(null);
+    setForm({
+      nombre: "",
+      importe: "",
+      categoria: categorias.some((categoria) => categoria.id === form.categoria) ? form.categoria : (categorias[0]?.id || ""),
       fecha: fechaSugerida,
-    }));
+    });
+    setFormError("");
     setModal(true);
+  };
+
+  const abrirEditarMovimiento = (movimiento) => {
+    setMovimientoEditando(movimiento);
+    setForm({
+      nombre: movimiento.nombre || "",
+      importe: String(Number(movimiento.importe || 0)).replace(".", ","),
+      categoria: categorias.some((categoria) => categoria.id === movimiento.categoria) ? movimiento.categoria : (categorias[0]?.id || ""),
+      fecha: normalizarFechaMovimiento(movimiento),
+    });
+    setFormError("");
+    setCategoriaMenu(false);
+    setModal(true);
+  };
+
+  const cerrarModalMovimiento = () => {
+    setModal(false);
+    setMovimientoEditando(null);
+    setFormError("");
+    setCategoriaMenu(false);
   };
 
   useEffect(() => {
     if (!cloudData || configurando) return;
-    cloudData.setKey("rumbo_v2", { versionDatos: 6, configurado: true, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias: categorias.map((categoria) => ({ ...categoria, usado: 0 })), movimientos, servicios, pagosPrevistos, metas, deudas });
+    cloudData.setKey("rumbo_v2", { versionDatos: 9, configurado: true, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias: categorias.map((categoria) => ({ ...categoria, usado: 0 })), movimientos, servicios, pagosPrevistos, metas, deudas });
   }, [configurando, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias, movimientos, servicios, pagosPrevistos, metas, deudas]);
-
-  useEffect(() => {
-    const generados = crearPagosPrevistos(categorias, servicios);
-    setPagosPrevistos((actuales) => {
-      const porId = new Map(actuales.map((pago) => [pago.id, pago]));
-      const siguientes = generados.map((generado) => ({
-        ...generado,
-        ...(porId.get(generado.id) || {}),
-        importe: generado.importe,
-        nombre: generado.nombre,
-        categoria: generado.categoria,
-        color: generado.color,
-        tipo: generado.tipo,
-        fijo: generado.fijo,
-        diaCobro: generado.diaCobro,
-        requiereDesglose: generado.requiereDesglose,
-      }));
-      return JSON.stringify(siguientes) === JSON.stringify(actuales) ? actuales : siguientes;
-    });
-  }, [categorias, servicios]);
 
   useEffect(() => {
     const comprobarCambioDeMes = () => {
@@ -352,15 +406,24 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
       return;
     }
     setFormError("");
-    setMovimientos((actuales) => [
-      { id: Date.now(), nombre: form.nombre.trim(), categoria: form.categoria, fechaISO: form.fecha, importe },
-      ...actuales,
-    ]);
+    if (movimientoEditando) {
+      setMovimientos((actuales) => actualizarMovimiento(actuales, movimientoEditando.id, {
+        nombre: form.nombre.trim(), categoria: form.categoria, fechaISO: form.fecha, importe,
+      }));
+    } else {
+      setMovimientos((actuales) => [
+        { id: Date.now(), nombre: form.nombre.trim(), categoria: form.categoria, fechaISO: form.fecha, importe },
+        ...actuales,
+      ]);
+    }
     setPeriodoActivo(periodoDeFecha(form.fecha));
     setForm({ nombre: "", importe: "", categoria: categorias[0]?.id || "", fecha: fechaLocalISO() });
     setCategoriaMenu(false);
     setModal(false);
-    setAviso(`Gasto de ${euros.format(importe)} añadido correctamente`);
+    setMovimientoEditando(null);
+    setAviso(movimientoEditando
+      ? tr("Movimiento actualizado correctamente", "Transaction updated successfully")
+      : tr(`Gasto de ${euros.format(importe)} añadido correctamente`, `Expense of ${euros.format(importe)} added successfully`));
     window.setTimeout(() => setAviso(""), 3200);
   };
 
@@ -388,10 +451,6 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
   };
 
   const alternarPagoPrevisto = (pago) => {
-    if (pago.requiereDesglose) {
-      abrirGestorSuscripciones();
-      return;
-    }
     const movimiento = buscarMovimientoDePago(pago, movimientos, periodoActivo);
     if (movimiento) {
       setMovimientos((actuales) => actuales.filter((item) => item.id !== movimiento.id));
@@ -448,16 +507,18 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
       diaCobro: Number(servicio.diaCobro),
       activo: true,
     })).filter((servicio) => servicio.nombre && Number.isFinite(servicio.precio) && servicio.precio > 0 && servicio.diaCobro >= 1 && servicio.diaCobro <= 31);
-    if (!limpias.length) return;
     const total = Number(limpias.reduce((suma, servicio) => suma + servicio.precio, 0).toFixed(2));
     setServicios(limpias);
     setCategorias((actuales) => {
       const existe = actuales.some((categoria) => categoria.id === "suscripciones");
+      if (!limpias.length) return actuales.filter((categoria) => categoria.id !== "suscripciones");
       if (existe) return actuales.map((categoria) => categoria.id === "suscripciones" ? { ...categoria, nombre: "Suscripciones", limite: total, color: categoria.color || "#ef7d4f" } : categoria);
       return [...actuales, { id: "suscripciones", nombre: "Suscripciones", limite: total, usado: 0, color: "#ef7d4f" }];
     });
     setSuscripcionesModal(false);
-    setAviso(tr(`${limpias.length} suscripciones guardadas por separado`, `${limpias.length} subscriptions saved separately`));
+    setAviso(limpias.length
+      ? tr(`${limpias.length} suscripciones actualizadas`, `${limpias.length} subscriptions updated`)
+      : tr("Se quitaron todas las suscripciones", "All subscriptions were removed"));
     window.setTimeout(() => setAviso(""), 3200);
   };
 
@@ -481,7 +542,7 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
     setDeudas(nuevasDeudas);
     if (cloudData) {
       await cloudData.setKey("rumbo_v2", {
-        versionDatos: 6,
+        versionDatos: 9,
         configurado: true,
         frecuenciaCobro: frecuencia,
         ingresoPorPago: Number(ingresoPorPago || 0),
@@ -514,6 +575,7 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
           <button className={vista === "resumen" ? "activo" : ""} onClick={() => { setVista("resumen"); setMenu(false); }}><LayoutDashboard size={18} /> {tr("Resumen", "Overview")}</button>
           <button onClick={() => setIngresosAbiertos(true)}><WalletCards size={18} /> {tr("Ingresos", "Income")}</button>
           <button className={vista === "movimientos" ? "activo" : ""} onClick={() => { setVista("movimientos"); setMenu(false); }}><CreditCard size={18} /> {tr("Movimientos", "Transactions")} <i>{movimientosDelPeriodo.length}</i></button>
+          <button className={vista === "previstos" ? "activo" : ""} onClick={() => { setVista("previstos"); setMenu(false); }}><ReceiptText size={18} /> {tr("Gastos previstos", "Planned expenses")} {pagosPrevistos.filter((pago) => pago.activo !== false).length > 0 && <i>{pagosPrevistos.filter((pago) => pago.activo !== false).length}</i>}</button>
           <button className={vista === "deudas" ? "activo" : ""} onClick={() => { setVista("deudas"); setMenu(false); }}><WalletCards size={18} /> {tr("Deudas", "Debts")} {deudas.length > 0 && <i>{deudas.length}</i>}</button>
           <button className={vista === "presupuestos" ? "activo" : ""} onClick={() => { setVista("presupuestos"); setMenu(false); }}><BarChart3 size={18} /> {tr("Presupuestos", "Budgets")}</button>
           <button className={vista === "metas" ? "activo" : ""} onClick={() => { setVista("metas"); setMenu(false); }}><Target size={18} /> {tr("Metas", "Goals")} {metas.length > 0 && <i>{metas.length}</i>}</button>
@@ -550,7 +612,22 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
               periodo={periodoActivo}
               onPeriodo={setPeriodoActivo}
               onAdd={abrirNuevoGasto}
+              onEdit={abrirEditarMovimiento}
               onBack={() => setVista("resumen")}
+            />
+          ) : vista === "previstos" ? (
+            <PlannedExpensesPage
+              language={settings.language}
+              pagos={pagosPrevistos}
+              categorias={categorias}
+              setCategorias={setCategorias}
+              periodo={periodoActivo}
+              movimientos={movimientos}
+              onChange={setPagosPrevistos}
+              onToggle={alternarPagoPrevisto}
+              onPeriodo={setPeriodoActivo}
+              onBack={() => setVista("resumen")}
+              onNotify={(mensaje) => { setAviso(mensaje); window.setTimeout(() => setAviso(""), 3200); }}
             />
           ) : vista === "metas" ? (
             <GoalsPage language={settings.language} metas={metas} setMetas={setMetas} onAdd={() => setMetaModal(true)} onBack={() => setVista("resumen")} />
@@ -570,14 +647,26 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
             <article className="demo-balance-card">
               <div className="demo-card-label"><span>{tr("Dinero disponible", "Available money")}</span><button><MoreHorizontal size={18} /></button></div>
               <strong>{euros.format(disponible)}</strong>
-              <div className="demo-balance-change"><TrendingUp size={15} /> {tr("Balance del periodo seleccionado", "Balance for the selected period")}</div>
+              <div className="demo-balance-change"><TrendingUp size={15} /> {tr("Sube con ingresos y baja con gastos", "Rises with income and falls with expenses")}</div>
               <div className="demo-mini-chart">
-                <svg viewBox="0 0 480 100" preserveAspectRatio="none" aria-hidden="true">
-                  <defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#5771e5" stopOpacity=".28"/><stop offset="1" stopColor="#5771e5" stopOpacity="0"/></linearGradient></defs>
-                  <path d="M0,81 C45,75 55,55 96,62 S150,88 190,62 S235,38 274,50 S330,74 365,43 S424,28 480,13 L480,100 L0,100 Z" fill="url(#area)" />
-                  <path d="M0,81 C45,75 55,55 96,62 S150,88 190,62 S235,38 274,50 S330,74 365,43 S424,28 480,13" fill="none" stroke="#5771e5" strokeWidth="3" strokeLinecap="round" />
+                <svg viewBox="0 0 480 100" preserveAspectRatio="none" role="img" aria-label={tr("Evolución del saldo: verde para ingresos y rojo para gastos", "Balance trend: green for income and red for expenses")}>
+                  <defs><linearGradient id="balance-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#5771e5" stopOpacity=".2"/><stop offset="1" stopColor="#5771e5" stopOpacity="0"/></linearGradient></defs>
+                  <path d={graficaBalance.area} fill="url(#balance-area)" />
+                  {graficaBalance.segmentos.map((segmento, indice) => <line
+                    key={`${segmento.hasta.x}-${indice}`}
+                    x1={segmento.desde.x} y1={segmento.desde.y}
+                    x2={segmento.hasta.x} y2={segmento.hasta.y}
+                    stroke={segmento.color} strokeWidth="3" strokeLinecap="round"
+                  />)}
+                  {graficaBalance.puntosEvento.map((punto, indice) => <circle
+                    key={`${punto.fecha}-${indice}`}
+                    cx={punto.x} cy={punto.y} r="3.5"
+                    fill={punto.delta < 0 ? "#e45c66" : "#26a889"}
+                    stroke="white" strokeWidth="1.5"
+                  />)}
                 </svg>
               </div>
+              <div className="demo-chart-legend"><span className="income"><i />+{euros.format(ingresos)} {tr("ingresos", "income")}</span><span className="expense"><i />−{euros.format(gastos)} {tr("gastos", "expenses")}</span></div>
             </article>
             <div className="demo-stat-stack">
               <article><span className="demo-stat-icon income"><ArrowDownRight size={19} /></span><div><small>{tr("Ingresos", "Income")}</small><b>{euros.format(ingresos)}</b><em>{tr("Proyección", "Projection")}</em></div></article>
@@ -597,43 +686,35 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
                   <h2>{tr("Pagos previstos", "Planned payments")}</h2>
                   <p>{periodoFuturo
                     ? tr(`Se activarán cuando comience ${etiquetaMes}`, `They will become available when ${etiquetaMes} begins`)
-                    : pagosSinDesglosar.length
-                      ? tr("Separa el total en cada suscripción", "Split the total into individual subscriptions")
                     : pagosPendientes.length
                       ? tr(`${pagosPendientes.length} pendientes · ${euros.format(totalPendiente)}`, `${pagosPendientes.length} pending · ${euros.format(totalPendiente)}`)
                       : tr(`Todo pagado en ${etiquetaMes}`, `Everything paid in ${etiquetaMes}`)}</p>
                 </div>
                 <div className="planned-payments-actions">
-                  <button onClick={abrirGestorSuscripciones}><Plus size={14} /> {tr("Suscripciones", "Subscriptions")}</button>
+                  <button onClick={() => setVista("previstos")}><SlidersHorizontal size={14} /> {tr("Gestionar gastos", "Manage expenses")}</button>
                   {pagosConEstado.length > 6 && <button onClick={() => setMostrarTodosPagos((actual) => !actual)}>{mostrarTodosPagos ? tr("Ver menos", "Show less") : tr("Ver todos", "View all")} <ArrowRightIcon /></button>}
                 </div>
               </div>
               {pagosVisibles.length ? <div className="planned-payments-grid">
                 {pagosVisibles.map((pago) => {
-                  const Icono = pago.tipo === "suscripcion" ? CreditCard : (iconos[pago.categoria] || ReceiptText);
+                  const Icono = iconos[pago.categoria] || ReceiptText;
                   const pagado = Boolean(pago.movimiento);
                   return <div className={pagado ? "planned-payment pagado" : "planned-payment"} key={pago.id}>
-                    <span className="planned-payment-icon" style={{ color: pago.color, background: `${pago.color || "#5771e5"}18` }}><Icono size={18} /></span>
+                    <span className={pago.tipo === "suscripcion" ? "planned-payment-icon subscription-brand" : "planned-payment-icon"} style={{ color: pago.color, background: `${pago.color || "#5771e5"}18` }}>{pago.tipo === "suscripcion" ? pago.sigla : <Icono size={18} />}</span>
                     <div className="planned-payment-copy"><b>{pago.nombre}</b><small>{pagado
                       ? tr(`Pagado el ${formatearFecha(pago.movimiento.fechaISO, settings.language, { corta: true })}`, `Paid ${formatearFecha(pago.movimiento.fechaISO, settings.language, { corta: true })}`)
-                      : pago.requiereDesglose
-                        ? tr("Toca “Separar” para indicar cada servicio", "Tap “Split” to add each service")
-                        : pago.tipo === "suscripcion" && pago.diaCobro
+                      : pago.tipo === "suscripcion" && pago.diaCobro
                           ? tr(`Cobro mensual · día ${pago.diaCobro}`, `Monthly charge · day ${pago.diaCobro}`)
                           : tr("Confirma el importe", "Confirm amount")}</small></div>
                     <strong>{euros.format(pagado ? pago.movimiento.importe : pago.importe)}</strong>
-                    {pago.requiereDesglose ? <button
-                      type="button"
-                      className="planned-payment-configure"
-                      onClick={abrirGestorSuscripciones}
-                    >{tr("Separar", "Split")}</button> : <button
+                    <button
                       type="button"
                       className={pagado ? "planned-payment-check activo" : "planned-payment-check"}
                       disabled={periodoFuturo && !pagado}
                       onClick={() => alternarPagoPrevisto(pago)}
                       aria-label={pagado ? tr(`Deshacer pago de ${pago.nombre}`, `Undo ${pago.nombre} payment`) : tr(`Registrar pago de ${pago.nombre}`, `Record ${pago.nombre} payment`)}
                       title={pagado ? tr("Deshacer", "Undo") : periodoFuturo ? tr("Disponible al comenzar el mes", "Available when the month begins") : tr("Registrar como pagado", "Mark as paid")}
-                    ><Check className="payment-check-icon" size={16} /><RotateCcw className="payment-undo-icon" size={14} /></button>}
+                    ><Check className="payment-check-icon" size={16} /><RotateCcw className="payment-undo-icon" size={14} /></button>
                   </div>;
                 })}
               </div> : <div className="planned-payments-empty"><CheckCircle2 size={22} /><div><b>{tr("No hay pagos previstos", "No planned payments")}</b><span>{tr("Añade presupuestos o suscripciones para verlos aquí.", "Add budgets or subscriptions to see them here.")}</span></div></div>}
@@ -642,9 +723,9 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
             <article className="demo-panel demo-budget-panel">
               <div className="demo-panel-head"><div><h2>{tr("Presupuesto por categoría", "Budget by category")}</h2><p>{tr("Tu progreso durante", "Your progress during")} {etiquetaMes}</p></div><button onClick={() => setVista("movimientos")}>{tr("Ver todos", "View all")} <ArrowRightIcon /></button></div>
               <div className="demo-categories">
-                {categoriasDelPeriodo.map((cat) => {
+                {categoriasDelPeriodo.filter((cat) => Number(cat.limite || 0) > 0 || Number(cat.usado || 0) > 0).map((cat) => {
                   const Icono = iconos[cat.id] || Sparkles;
-                  const pct = Math.min(100, Math.round((cat.usado / cat.limite) * 100));
+                  const pct = Number(cat.limite || 0) > 0 ? Math.min(100, Math.round((cat.usado / cat.limite) * 100)) : (cat.usado > 0 ? 100 : 0);
                   return <div className="demo-category" key={cat.id}>
                     <span className="demo-category-icon" style={{ color: cat.color, background: `${cat.color}16` }}><Icono size={18} /></span>
                     <div className="demo-category-info"><div><b>{cat.nombre}</b><span>{euros.format(cat.usado)} <small>de {euros.format(cat.limite)}</small></span></div><div className="demo-category-track"><i style={{ width: `${pct}%`, background: cat.color }} /></div></div>
@@ -659,7 +740,7 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
               <div className="demo-movement-list">
                 {filtrados.length ? filtrados.slice(0, 5).map((mov) => {
                   const Icono = mov.categoria === "comida" ? Utensils : (iconos[mov.categoria] || CreditCard);
-                  return <div className="demo-movement" key={mov.id}><span><Icono size={18} /></span><div><b>{mov.nombre}</b><small>{formatearFecha(mov.fechaISO, settings.language, { corta: true })}</small></div><strong>−{euros.format(mov.importe)}</strong></div>;
+                  return <div className="demo-movement" key={mov.id}><span><Icono size={18} /></span><div><b>{mov.nombre}</b><small>{formatearFecha(mov.fechaISO, settings.language, { corta: true })}</small></div><strong>−{euros.format(mov.importe)}</strong><button type="button" className="movement-edit-button" onClick={() => abrirEditarMovimiento(mov)} aria-label={tr(`Editar ${mov.nombre}`, `Edit ${mov.nombre}`)} title={tr("Editar movimiento", "Edit transaction")}><Pencil size={14} /></button></div>;
                 }) : <div className="demo-empty">{movimientosDelPeriodo.length
                   ? tr("No hay movimientos que coincidan con la búsqueda.", "No transactions match your search.")
                   : tr("Todavía no has registrado ningún gasto.", "You have not recorded any expenses yet.")}</div>}
@@ -673,11 +754,11 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
       </main>
 
       {modal && (
-        <div className="demo-modal-backdrop" onMouseDown={() => { setModal(false); setFormError(""); setCategoriaMenu(false); }}>
+        <div className="demo-modal-backdrop" onMouseDown={cerrarModalMovimiento}>
           <form className="demo-modal" onSubmit={guardarMovimiento} onMouseDown={(e) => e.stopPropagation()}>
-            <button type="button" className="demo-modal-close" onClick={() => { setModal(false); setFormError(""); setCategoriaMenu(false); }}><X size={18} /></button>
+            <button type="button" className="demo-modal-close" onClick={cerrarModalMovimiento}><X size={18} /></button>
             <span className="demo-modal-icon"><WalletCards size={22} /></span>
-            <h2>{tr("Nuevo movimiento", "New transaction")}</h2><p>{cloudData ? tr("El gasto se guardará y sincronizará con tu cuenta.", "This expense will be saved and synced with your account.") : tr("Prueba la interacción. Estos datos no se guardarán.", "Try the interaction. This preview does not save data.")}</p>
+            <h2>{movimientoEditando ? tr("Editar movimiento", "Edit transaction") : tr("Nuevo movimiento", "New transaction")}</h2><p>{movimientoEditando ? tr("Cambia la categoría, el importe, la fecha o la descripción.", "Change the category, amount, date or description.") : cloudData ? tr("El gasto se guardará y sincronizará con tu cuenta.", "This expense will be saved and synced with your account.") : tr("Prueba la interacción. Estos datos no se guardarán.", "Try the interaction. This preview does not save data.")}</p>
             <label>{tr("Descripción", "Description")}<input autoFocus placeholder={tr("Ej. Supermercado", "E.g. Groceries")} value={form.nombre} onChange={(e) => { setForm({ ...form, nombre: e.target.value }); setFormError(""); }} /></label>
             <div className="demo-form-row">
               <label>{tr("Importe", "Amount")}<input type="text" inputMode="decimal" placeholder="0,00" value={form.importe} onChange={(e) => { const valor = e.target.value; if (/^\d*[.,]?\d{0,2}$/.test(valor)) { setForm({ ...form, importe: valor }); setFormError(""); } }} /></label>
@@ -694,7 +775,7 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
             </div>
             <label className="demo-date-field">{tr("Fecha del gasto", "Expense date")}<div><CalendarDays size={17} /><input type="date" max={fechaLocalISO()} value={form.fecha} onChange={(e) => { setForm({ ...form, fecha: e.target.value }); setFormError(""); }} /></div></label>
             {formError && <div className="demo-form-error"><CircleHelp size={15} /> {formError}</div>}
-            <button className="demo-modal-submit" type="submit" disabled={!importeValido}>{tr("Añadir gasto", "Add expense")}</button>
+            <button className="demo-modal-submit" type="submit" disabled={!importeValido}>{movimientoEditando ? tr("Guardar cambios", "Save changes") : tr("Añadir gasto", "Add expense")}</button>
           </form>
         </div>
       )}
@@ -734,8 +815,6 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
             <span className="demo-modal-icon subscriptions"><CreditCard size={22} /></span>
             <h2>{tr("Tus suscripciones, una por una", "Your subscriptions, one by one")}</h2>
             <p>{tr("Añade cada servicio con su importe y día de cobro. Cada uno tendrá su propio check en el resumen.", "Add every service with its amount and billing day. Each one will have its own checkbox in the overview.")}</p>
-            {!servicios.length && <div className="subscriptions-legacy-note"><CircleHelp size={16} /><span>{tr(`Antes solo se guardó el total de ${euros.format(categorias.find((categoria) => categoria.id === "suscripciones")?.limite || 0)}. Desglósalo aquí una única vez.`, `Previously only the ${euros.format(categorias.find((categoria) => categoria.id === "suscripciones")?.limite || 0)} total was saved. Split it here once.`)}</span></div>}
-
             <div className="subscriptions-manager-list">
               {suscripcionesBorrador.map((servicio) => <div className="subscriptions-manager-row" key={servicio.id}>
                 <label><span>{tr("Servicio", "Service")}</span><input value={servicio.nombre} onChange={(e) => actualizarSuscripcionBorrador(servicio.id, "nombre", e.target.value)} /></label>
@@ -755,7 +834,7 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
 
             <footer className="subscriptions-manager-footer">
               <div><span>{suscripcionesBorrador.length} {tr("suscripciones", "subscriptions")}</span><b>{euros.format(suscripcionesBorrador.reduce((suma, servicio) => suma + (Number(String(servicio.precio).replace(",", ".")) || 0), 0))} / {tr("mes", "month")}</b></div>
-              <button type="button" className="demo-modal-submit" onClick={guardarSuscripciones} disabled={!suscripcionesBorrador.length}>{tr("Guardar por separado", "Save separately")}</button>
+              <button type="button" className="demo-modal-submit" onClick={guardarSuscripciones}>{tr("Guardar cambios", "Save changes")}</button>
             </footer>
           </section>
         </div>
@@ -766,6 +845,139 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
       {aviso && <div className="demo-toast"><span>✓</span><div><b>{tr("Rumbo actualizado", "Rumbo updated")}</b><small>{aviso}</small></div></div>}
     </div>
   );
+}
+
+function PlannedExpensesPage({ language, pagos, categorias, setCategorias, periodo, movimientos, onChange, onToggle, onPeriodo, onBack, onNotify }) {
+  const tr = (es, en) => language === "en" ? en : es;
+  const [editor, setEditor] = useState(null);
+  const [error, setError] = useState("");
+  const activos = pagos.filter((pago) => pago.activo !== false);
+  const pausados = pagos.filter((pago) => pago.activo === false);
+  const totalMensual = activos.reduce((total, pago) => total + Number(pago.importe || 0), 0);
+  const filas = pagos.map((pago) => ({ ...pago, movimiento: buscarMovimientoDePago(pago, movimientos, periodo) }))
+    .sort((a, b) => Number(a.diaCobro || 1) - Number(b.diaCobro || 1) || a.nombre.localeCompare(b.nombre));
+
+  const categoriaPorId = (id) => categorias.find((categoria) => categoria.id === id);
+  const abrirNuevo = () => {
+    setError("");
+    setEditor({ id: null, nombre: "", importe: "", diaCobro: "1", categoria: categorias.find((categoria) => categoria.id === "hogar")?.id || categorias[0]?.id || "imprevistos", tipo: "previsto", fijo: false, activo: true });
+  };
+  const abrirEditar = (pago) => {
+    setError("");
+    setEditor({ ...pago, importe: String(pago.importe).replace(".", ","), diaCobro: String(pago.diaCobro || 1) });
+  };
+  const cerrarEditor = () => { setEditor(null); setError(""); };
+
+  const guardar = (event) => {
+    event.preventDefault();
+    const importe = Number(String(editor.importe).replace(",", "."));
+    const diaCobro = Number(editor.diaCobro);
+    if (!String(editor.nombre || "").trim()) return setError(tr("Escribe el nombre del gasto previsto.", "Enter a name for the planned expense."));
+    if (!Number.isFinite(importe) || importe <= 0) return setError(tr("Introduce un importe mayor que 0 €.", "Enter an amount greater than €0."));
+    if (!Number.isInteger(diaCobro) || diaCobro < 1 || diaCobro > 31) return setError(tr("El día de cobro debe estar entre 1 y 31.", "Billing day must be between 1 and 31."));
+
+    const esSuscripcion = editor.tipo === "suscripcion";
+    const categoria = esSuscripcion ? "suscripciones" : editor.categoria;
+    if (!esSuscripcion && !categoriaPorId(categoria)) return setError(tr("Selecciona una categoría válida.", "Select a valid category."));
+    if (esSuscripcion && !categoriaPorId("suscripciones")) {
+      setCategorias((actuales) => [...actuales, { id: "suscripciones", nombre: "Suscripciones", limite: 0, usado: 0, color: "#ef7d4f" }]);
+    }
+
+    const limpio = {
+      nombre: String(editor.nombre).trim(),
+      importe,
+      diaCobro,
+      categoria,
+      tipo: esSuscripcion ? "suscripcion" : "previsto",
+      fijo: esSuscripcion ? true : Boolean(editor.fijo),
+      activo: editor.activo !== false,
+      color: esSuscripcion ? (editor.color || "#ef7d4f") : (categoriaPorId(categoria)?.color || editor.color || "#5771e5"),
+      sigla: esSuscripcion ? String(editor.nombre).trim().slice(0, 2).toUpperCase() : undefined,
+    };
+    const siguientes = editor.id
+      ? actualizarPagoPrevisto(pagos, editor.id, limpio)
+      : [...pagos, { ...limpio, id: `${esSuscripcion ? "suscripcion" : "previsto"}-personalizado-${Date.now()}` }];
+    onChange(normalizarPagosPrevistos(siguientes));
+    onNotify(editor.id ? tr("Gasto previsto actualizado", "Planned expense updated") : tr("Gasto previsto añadido", "Planned expense added"));
+    cerrarEditor();
+  };
+
+  const alternarActivo = (pago) => {
+    const activo = pago.activo === false;
+    onChange(actualizarPagoPrevisto(pagos, pago.id, { activo }));
+    onNotify(activo ? tr(`${pago.nombre} vuelve a estar activo`, `${pago.nombre} is active again`) : tr(`${pago.nombre} se ha pausado`, `${pago.nombre} has been paused`));
+  };
+
+  const eliminar = (pago) => {
+    if (!window.confirm(tr(
+      `¿Eliminar “${pago.nombre}” de los próximos meses? Los movimientos ya registrados permanecerán en el historial.`,
+      `Remove “${pago.nombre}” from future months? Existing transactions will remain in your history.`,
+    ))) return;
+    onChange(eliminarPagoPrevisto(pagos, pago.id));
+    onNotify(tr("Gasto previsto eliminado; el historial se conserva", "Planned expense removed; history was kept"));
+  };
+
+  return <section className="planned-expenses-page">
+    <header className="planned-expenses-page-head">
+      <div>
+        <button onClick={onBack}><ArrowLeft size={15} /> {tr("Volver al resumen", "Back to overview")}</button>
+        <span>{tr("PLANIFICACIÓN MENSUAL", "MONTHLY PLANNING")}</span>
+        <h1>{tr("Gastos previstos", "Planned expenses")}</h1>
+        <p>{tr("Administra alquiler, suministros y suscripciones sin borrar los pagos que ya hiciste.", "Manage rent, utilities and subscriptions without deleting payments you already made.")}</p>
+      </div>
+      <button className="planned-expenses-add" onClick={abrirNuevo}><Plus size={17} /> {tr("Añadir gasto previsto", "Add planned expense")}</button>
+    </header>
+
+    <div className="planned-expenses-summary">
+      <article><span><ReceiptText size={18} /></span><div><small>{tr("Activos", "Active")}</small><b>{activos.length}</b></div></article>
+      <article><span><CalendarDays size={18} /></span><div><small>{tr("Total previsto al mes", "Expected monthly total")}</small><b>{euros.format(totalMensual)}</b></div></article>
+      <article><span><CheckCircle2 size={18} /></span><div><small>{tr("Pagados en", "Paid in")} {etiquetaPeriodo(periodo, language)}</small><b>{filas.filter((pago) => pago.movimiento).length} / {activos.length}</b></div></article>
+      <article><span><RotateCcw size={18} /></span><div><small>{tr("Pausados", "Paused")}</small><b>{pausados.length}</b></div></article>
+    </div>
+
+    <div className="planned-expenses-toolbar">
+      <div><b>{tr("Tus pagos recurrentes", "Your recurring payments")}</b><small>{tr("El check registra el movimiento del mes seleccionado.", "The check records the transaction for the selected month.")}</small></div>
+      <MonthNavigator periodo={periodo} onChange={onPeriodo} language={language} />
+    </div>
+
+    {filas.length ? <div className="planned-expenses-list">{filas.map((pago) => {
+      const categoria = categoriaPorId(pago.categoria);
+      const Icono = iconos[pago.categoria] || ReceiptText;
+      const pagado = Boolean(pago.movimiento);
+      const pausado = pago.activo === false;
+      return <article className={`${pausado ? "pausado" : ""} ${pagado ? "pagado" : ""}`} key={pago.id}>
+        <span className="planned-expense-icon" style={{ color: pago.color, background: `${pago.color || "#5771e5"}18` }}>{pago.tipo === "suscripcion" ? pago.sigla : <Icono size={19} />}</span>
+        <div className="planned-expense-main"><b>{pago.nombre}</b><small>{categoria?.nombre || tr("Sin categoría", "No category")} · {tr("día", "day")} {pago.diaCobro || 1} · {pago.fijo ? tr("importe fijo", "fixed amount") : tr("importe confirmable", "confirmable amount")}</small></div>
+        <strong>{euros.format(pago.importe)}</strong>
+        <em className={pausado ? "pausado" : pagado ? "pagado" : "pendiente"}>{pausado ? tr("Pausado", "Paused") : pagado ? tr("Pagado", "Paid") : tr("Pendiente", "Pending")}</em>
+        <div className="planned-expense-actions">
+          {!pausado && <button className={pagado ? "check activo" : "check"} onClick={() => onToggle(pago)} title={pagado ? tr("Deshacer pago", "Undo payment") : tr("Registrar pago", "Record payment")}><Check size={15} /></button>}
+          <button onClick={() => abrirEditar(pago)} title={tr("Editar", "Edit")}><Pencil size={15} /></button>
+          <button onClick={() => alternarActivo(pago)} title={pausado ? tr("Reactivar", "Reactivate") : tr("Pausar", "Pause")}><RotateCcw size={15} /></button>
+          <button className="delete" onClick={() => eliminar(pago)} title={tr("Eliminar", "Delete")}><Trash2 size={15} /></button>
+        </div>
+      </article>;
+    })}</div> : <div className="planned-expenses-page-empty"><ReceiptText size={28} /><b>{tr("Todavía no tienes gastos previstos", "You have no planned expenses yet")}</b><span>{tr("Añade el alquiler, tus suministros o una suscripción.", "Add rent, utilities or a subscription.")}</span><button onClick={abrirNuevo}><Plus size={15} /> {tr("Añadir el primero", "Add your first")}</button></div>}
+
+    {editor && <div className="demo-modal-backdrop" onMouseDown={cerrarEditor}>
+      <form className="demo-modal planned-expense-editor" onSubmit={guardar} onMouseDown={(event) => event.stopPropagation()}>
+        <button type="button" className="demo-modal-close" onClick={cerrarEditor}><X size={18} /></button>
+        <span className="demo-modal-icon planned"><ReceiptText size={22} /></span>
+        <h2>{editor.id ? tr("Editar gasto previsto", "Edit planned expense") : tr("Nuevo gasto previsto", "New planned expense")}</h2>
+        <p>{tr("Podrás modificarlo, pausarlo o quitarlo cuando cambie tu situación.", "You can edit, pause or remove it whenever your situation changes.")}</p>
+        <div className="planned-expense-type"><button type="button" className={editor.tipo === "previsto" ? "activo" : ""} onClick={() => setEditor({ ...editor, tipo: "previsto", fijo: false })}><Home size={16} /> {tr("Gasto recurrente", "Recurring expense")}</button><button type="button" className={editor.tipo === "suscripcion" ? "activo" : ""} onClick={() => setEditor({ ...editor, tipo: "suscripcion", fijo: true })}><CreditCard size={16} /> {tr("Suscripción", "Subscription")}</button></div>
+        <label>{tr("Nombre", "Name")}<input autoFocus value={editor.nombre} placeholder={tr("Ej. Alquiler", "E.g. Rent")} onChange={(event) => { setEditor({ ...editor, nombre: event.target.value }); setError(""); }} /></label>
+        <div className="demo-form-row">
+          <label>{tr("Importe previsto", "Expected amount")}<input inputMode="decimal" value={editor.importe} placeholder="0,00" onChange={(event) => { if (/^\d*[.,]?\d{0,2}$/.test(event.target.value)) { setEditor({ ...editor, importe: event.target.value }); setError(""); } }} /></label>
+          <label>{tr("Día de cobro", "Billing day")}<input type="number" min="1" max="31" value={editor.diaCobro} onChange={(event) => { setEditor({ ...editor, diaCobro: event.target.value }); setError(""); }} /></label>
+        </div>
+        {editor.tipo !== "suscripcion" && <label>{tr("Categoría del movimiento", "Transaction category")}<select value={editor.categoria} onChange={(event) => setEditor({ ...editor, categoria: event.target.value })}>{categorias.filter((categoria) => categoria.id !== "suscripciones").map((categoria) => <option key={categoria.id} value={categoria.id}>{categoria.nombre}</option>)}</select></label>}
+        {editor.tipo !== "suscripcion" && <button type="button" className={editor.fijo ? "planned-expense-fixed activo" : "planned-expense-fixed"} onClick={() => setEditor({ ...editor, fijo: !editor.fijo })}><span><Check size={13} /></span><div><b>{tr("El importe siempre es exacto", "The amount is always exact")}</b><small>{tr("Si lo activas, el check registra el pago sin pedir confirmación.", "When enabled, the check records the payment without confirmation.")}</small></div></button>}
+        {error && <div className="demo-form-error"><CircleHelp size={15} /> {error}</div>}
+        <button className="demo-modal-submit" type="submit">{editor.id ? tr("Guardar cambios", "Save changes") : tr("Añadir gasto previsto", "Add planned expense")}</button>
+      </form>
+    </div>}
+  </section>;
 }
 
 function BudgetPage({ categorias, setCategorias, ingresos, frecuencia, onBack, language }) {
@@ -908,7 +1120,7 @@ function PiggyBankIcon() {
   return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 5c-1.5-1.2-3.4-2-5.5-2C8.8 3 5 6 5 10c0 1.8.8 3.5 2 4.7V19h3v-2h5v2h3v-4c1.2-.7 2-2 2-3.5V9h-2.2c-.4-.8-.9-1.5-1.6-2.1"/><path d="M8 4 6 2v4M14 7h.01"/></svg>;
 }
 
-function MovementsPage({ movimientos, categorias, busqueda, periodo, onPeriodo, onAdd, onBack, language }) {
+function MovementsPage({ movimientos, categorias, busqueda, periodo, onPeriodo, onAdd, onEdit, onBack, language }) {
   const [filtro, setFiltro] = useState("todas");
   const tr = (es, en) => language === "en" ? en : es;
   const mapaCategorias = useMemo(() => Object.fromEntries(categorias.map((categoria) => [categoria.id, categoria])), [categorias]);
@@ -979,7 +1191,7 @@ function MovementsPage({ movimientos, categorias, busqueda, periodo, onPeriodo, 
 
     <section className="all-movements-card">
       <div className="all-movements-head"><div><h2>{tr("Historial de gastos", "Spending history")}</h2><p>{lista.length} {tr("movimientos encontrados", "transactions found")}</p></div><div className="movement-filter-bar"><button className={filtro === "todas" ? "activo" : ""} onClick={() => setFiltro("todas")}>{tr("Todos", "All")}</button>{resumen.slice(0, 5).map((categoria) => <button key={categoria.id} className={filtro === categoria.id ? "activo" : ""} onClick={() => setFiltro(categoria.id)}><i style={{ background: categoria.color }} />{categoria.nombre}</button>)}</div></div>
-      <div className="all-movement-labels"><span>Movimiento</span><span>Categoría</span><span>Fecha</span><span>Importe</span></div>
+      <div className="all-movement-labels"><span>{tr("Movimiento", "Transaction")}</span><span>{tr("Categoría", "Category")}</span><span>{tr("Fecha", "Date")}</span><span>{tr("Importe", "Amount")}</span><span>{tr("Acciones", "Actions")}</span></div>
       <div className="all-movement-list">{lista.length ? lista.map((movimiento) => {
         const categoria = mapaCategorias[movimiento.categoria] || { nombre: "Otros", color: "#8a96a7" };
         const Icono = iconos[movimiento.categoria] || CreditCard;
@@ -987,6 +1199,7 @@ function MovementsPage({ movimientos, categorias, busqueda, periodo, onPeriodo, 
           <div className="all-movement-name"><span style={{ color: categoria.color, background: `${categoria.color}18` }}><Icono size={19} /></span><div><b>{movimiento.nombre}</b><small>Pago realizado</small></div></div>
           <div className="all-movement-category"><i style={{ background: categoria.color }} />{categoria.nombre}</div>
           <time dateTime={movimiento.fechaISO}>{formatearFecha(movimiento.fechaISO, language, { corta: true })}</time><strong>−{euros.format(movimiento.importe)}</strong>
+          <button type="button" className="movement-edit-button" onClick={() => onEdit(movimiento)} aria-label={tr(`Editar ${movimiento.nombre}`, `Edit ${movimiento.nombre}`)} title={tr("Editar movimiento", "Edit transaction")}><Pencil size={15} /></button>
         </article>;
       }) : <div className="movements-empty"><Search size={25} /><b>{movimientos.length ? tr("No encontramos gastos", "No expenses found") : tr("Aún no tienes movimientos", "You have no transactions yet")}</b><span>{movimientos.length ? tr("Prueba con otra búsqueda o categoría.", "Try another search or category.") : tr("Pulsa «Añadir gasto» para registrar el primero.", "Select “Add expense” to record the first one.")}</span></div>}</div>
     </section>

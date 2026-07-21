@@ -1,4 +1,6 @@
-const CATEGORIAS_RECURRENTES = new Set(["hogar", "electricidad", "suministros", "telefonia", "suscripciones"]);
+// "Suscripciones" es una categoría de presupuesto, no un pago real. Cada
+// servicio seleccionado se convierte en su propio pago previsto más abajo.
+const CATEGORIAS_RECURRENTES = new Set(["hogar", "electricidad", "suministros", "telefonia"]);
 
 function textoId(valor) {
   return String(valor || "")
@@ -17,6 +19,7 @@ export function crearPagosPrevistos(categorias = [], servicios = []) {
       nombre: servicio.nombre || "Suscripción",
       importe: Number(servicio.precio),
       diaCobro: Math.min(31, Math.max(1, Number(servicio.diaCobro) || 1)),
+      sigla: servicio.sigla || String(servicio.nombre || "S").slice(0, 2).toUpperCase(),
       categoria: "suscripciones",
       tipo: "suscripcion",
       fijo: true,
@@ -24,19 +27,18 @@ export function crearPagosPrevistos(categorias = [], servicios = []) {
       color: servicio.color || "#ef7d4f",
     }));
 
-  const tieneSuscripcionesIndividuales = suscripciones.length > 0;
   const previstos = categorias
     .filter((categoria) => CATEGORIAS_RECURRENTES.has(categoria?.id) || categoria?.recurrente === true)
     .filter((categoria) => Number(categoria?.limite) > 0)
-    .filter((categoria) => !(categoria.id === "suscripciones" && tieneSuscripcionesIndividuales))
+    .filter((categoria) => categoria.id !== "suscripciones")
     .map((categoria) => ({
       id: `previsto-${textoId(categoria.id || categoria.nombre)}`,
       nombre: categoria.nombre || "Gasto previsto",
       importe: Number(categoria.limite),
+      diaCobro: 1,
       categoria: categoria.id,
-      tipo: categoria.id === "suscripciones" ? "suscripcion" : "previsto",
+      tipo: "previsto",
       fijo: false,
-      requiereDesglose: categoria.id === "suscripciones" && !tieneSuscripcionesIndividuales,
       activo: true,
       color: categoria.color || "#5771e5",
     }));
@@ -49,20 +51,45 @@ export function crearPagosPrevistos(categorias = [], servicios = []) {
 }
 
 export function normalizarPagosPrevistos(pagos, categorias = [], servicios = []) {
-  if (!Array.isArray(pagos) || !pagos.length) return crearPagosPrevistos(categorias, servicios);
+  if (!Array.isArray(pagos)) return crearPagosPrevistos(categorias, servicios);
+
+  // Desde la versión 9 los pagos guardados son la fuente de verdad. De esta
+  // forma, quitar el alquiler o cancelar una suscripción no hace que reaparezcan
+  // al volver a abrir Rumbo solo porque su categoría de presupuesto continúe.
   return pagos
-    .filter((pago) => pago && pago.activo !== false && Number(pago.importe) > 0)
+    .filter((pago) => pago && pago.nombre !== "Suscripciones" && Number(pago.importe) > 0)
     .map((pago, index) => ({
       ...pago,
-      id: pago.id || `previsto-migrado-${index}`,
+      id: String(pago.id || `previsto-guardado-${index}`),
+      nombre: String(pago.nombre || "Gasto previsto").trim(),
       importe: Number(pago.importe),
-      categoria: pago.categoria || "hogar",
-      tipo: pago.tipo || "previsto",
-      fijo: pago.fijo ?? pago.tipo === "suscripcion",
-      diaCobro: pago.diaCobro ? Math.min(31, Math.max(1, Number(pago.diaCobro))) : undefined,
-      requiereDesglose: Boolean(pago.requiereDesglose),
-      activo: true,
-    }));
+      diaCobro: Math.min(31, Math.max(1, Number(pago.diaCobro) || 1)),
+      categoria: pago.categoria || "imprevistos",
+      tipo: pago.tipo === "suscripcion" ? "suscripcion" : "previsto",
+      fijo: pago.fijo === true,
+      activo: pago.activo !== false,
+      color: pago.color || "#5771e5",
+    }))
+    .sort((a, b) => Number(a.diaCobro) - Number(b.diaCobro) || a.nombre.localeCompare(b.nombre));
+}
+
+export function migrarPagosPrevistos(pagos, categorias = [], servicios = []) {
+  const guardados = normalizarPagosPrevistos(Array.isArray(pagos) ? pagos : [], categorias, servicios);
+  const porId = new Map(guardados.map((pago) => [pago.id, pago]));
+
+  crearPagosPrevistos(categorias, servicios).forEach((generado) => {
+    if (!porId.has(generado.id)) porId.set(generado.id, generado);
+  });
+
+  return normalizarPagosPrevistos([...porId.values()], categorias, servicios);
+}
+
+export function actualizarPagoPrevisto(pagos = [], id, cambios = {}) {
+  return pagos.map((pago) => pago.id === id ? { ...pago, ...cambios, id: pago.id } : pago);
+}
+
+export function eliminarPagoPrevisto(pagos = [], id) {
+  return pagos.filter((pago) => pago.id !== id);
 }
 
 export function buscarMovimientoDePago(pago, movimientos = [], periodo) {

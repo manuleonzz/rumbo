@@ -29,9 +29,10 @@ button, input, select { max-width:100%; }
   .demo-page-title { gap:17px;margin-bottom:20px; }
   .demo-page-title h1 { font-size:25px;line-height:1.15; }
   .demo-summary-grid, .demo-lower-grid { gap:13px; }
-  .demo-balance-card { min-height:235px;padding:19px 18px 0; }
+  .demo-balance-card { min-height:235px;padding:19px 18px 12px; }
   .demo-balance-card>strong { font-size:29px; }
   .demo-mini-chart { margin-left:-18px;margin-right:-18px; }
+  .demo-chart-legend { flex-wrap:wrap;gap:6px 12px; }
   .demo-stat-stack article { min-height:92px;padding:16px; }
   .demo-health-card { min-height:235px;padding:19px;overflow:hidden; }
   .demo-health-card .demo-donut { width:124px;height:124px;margin:20px auto 15px; }

@@ -4,6 +4,8 @@ import React, { useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
+  Baby,
+  Briefcase,
   CalendarDays,
   Car,
   Check,
@@ -13,8 +15,12 @@ import {
   Film,
   Home,
   HeartPulse,
+  Gift,
+  GraduationCap,
   Lightbulb,
   Plus,
+  PawPrint,
+  Plane,
   ReceiptText,
   Rocket,
   Search,
@@ -23,10 +29,12 @@ import {
   ShoppingBasket,
   Sparkles,
   Smartphone,
+  Scissors,
   Trash2,
   Utensils,
   WalletCards,
   Wifi,
+  Wrench,
   X,
   Zap,
 } from "lucide-react";
@@ -49,8 +57,18 @@ const categoriasBase = [
   { id: "comida", nombre: "Supermercado", ayuda: "Compra para casa", importe: 400, color: "#26a889", icono: ShoppingBasket },
   { id: "salud", nombre: "Salud", ayuda: "Médico, farmacia y seguro", importe: 100, color: "#d95b7a", icono: HeartPulse },
   { id: "restaurantes", nombre: "Restaurantes", ayuda: "Comer fuera y delivery", importe: 150, color: "#e56d7a", icono: Utensils },
-  { id: "ropa", nombre: "Ropa y cuidado", ayuda: "Ropa, peluquería y otros", importe: 100, color: "#3d9cc8", icono: Shirt },
+  { id: "ropa", nombre: "Ropa", ayuda: "Ropa y calzado", importe: 100, color: "#3d9cc8", icono: Shirt },
   { id: "entretenimiento", nombre: "Entretenimiento", ayuda: "Cine, juegos y eventos", importe: 120, color: "#ef7d4f", icono: Film },
+  { id: "mascotas", nombre: "Mascotas", ayuda: "Comida, veterinario y cuidados", importe: 0, color: "#8b65d9", icono: PawPrint },
+  { id: "educacion", nombre: "Educación y formación", ayuda: "Cursos, libros y estudios", importe: 0, color: "#3d8bbf", icono: GraduationCap },
+  { id: "viajes", nombre: "Viajes", ayuda: "Transporte, alojamiento y vacaciones", importe: 0, color: "#2aa58a", icono: Plane },
+  { id: "regalos", nombre: "Regalos y donaciones", ayuda: "Regalos, ayuda y aportes", importe: 0, color: "#e56d7a", icono: Gift },
+  { id: "familia", nombre: "Familia y cuidado", ayuda: "Niños, cuidados y apoyo familiar", importe: 0, color: "#d99556", icono: Baby },
+  { id: "seguros", nombre: "Seguros e impuestos", ayuda: "Seguros generales, tasas e impuestos", importe: 0, color: "#6879c9", icono: ShieldCheck },
+  { id: "mantenimiento", nombre: "Mantenimiento del hogar", ayuda: "Reparaciones, muebles y limpieza", importe: 0, color: "#9a7658", icono: Wrench },
+  { id: "cuidado_personal", nombre: "Cuidado personal", ayuda: "Peluquería, higiene y cosmética", importe: 0, color: "#cf6fa4", icono: Scissors },
+  { id: "trabajo", nombre: "Gastos de trabajo", ayuda: "Material, ropa o herramientas", importe: 0, color: "#60758a", icono: Briefcase },
+  { id: "imprevistos", nombre: "Otros e imprevistos", ayuda: "Gastos que no encajan en otra categoría", importe: 0, color: "#7a8796", icono: ReceiptText },
 ];
 
 const serviciosBase = [
@@ -58,6 +76,7 @@ const serviciosBase = [
   { id: "spotify", nombre: "Spotify", precio: 11.99, sigla: "S", color: "#1db954", tipo: "musica" },
   { id: "prime", nombre: "Amazon Prime", precio: 4.99, sigla: "P", color: "#159bd7", tipo: "video" },
   { id: "youtube", nombre: "YouTube Premium", precio: 13.99, sigla: "Y", color: "#ff0033", tipo: "video" },
+  { id: "chatgpt", nombre: "ChatGPT", precio: 22.99, sigla: "AI", color: "#10a37f", tipo: "software" },
   { id: "gimnasio", nombre: "Gimnasio", precio: 29.99, sigla: "G", color: "#6f7a86", tipo: "bienestar" },
   { id: "icloud", nombre: "iCloud+", precio: 2.99, sigla: "iC", color: "#5b9df1", tipo: "software" },
   { id: "disney", nombre: "Disney+", precio: 10.99, sigla: "D+", color: "#173cc4", tipo: "video" },
@@ -124,7 +143,9 @@ export default function FinanceOnboarding({ onComplete, onCancel, settings, isDe
   const [frecuencia, setFrecuencia] = useState("semanal");
   const [ingreso, setIngreso] = useState("650");
   const [categorias, setCategorias] = useState(categoriasBase);
-  const [servicios, setServicios] = useState(serviciosBase.map((s) => ({ ...s, diaCobro: 1, activo: ["netflix", "spotify"].includes(s.id) })));
+  // Ningún servicio viene marcado de fábrica: en el resumen aparecerán
+  // exclusivamente los que la persona elija de forma explícita.
+  const [servicios, setServicios] = useState(serviciosBase.map((s) => ({ ...s, diaCobro: 1, activo: false })));
   const [suscripcionesAbiertas, setSuscripcionesAbiertas] = useState(false);
   const [filtroSuscripcion, setFiltroSuscripcion] = useState("todas");
   const [busquedaSuscripcion, setBusquedaSuscripcion] = useState("");
@@ -135,8 +156,8 @@ export default function FinanceOnboarding({ onComplete, onCancel, settings, isDe
   const [deudas, setDeudas] = useState([]);
   const [deudaBorrador, setDeudaBorrador] = useState({ tipo: "coche", nombre: "", saldo: "", cuota: "", tae: "" });
   const tr = (es, en) => settings.language === "en" ? en : es;
-  const categoryEnglish = { hogar: "Home", suministros: "Household utilities", telefonia: "Mobile phone", transporte: "Transport", comida: "Groceries", salud: "Health", restaurantes: "Restaurants", ropa: "Clothing & care", entretenimiento: "Entertainment" };
-  const categoryHelpEnglish = { hogar: "Rent or mortgage", suministros: "Power, water, gas and home internet", telefonia: "Mobile plan and phone", transporte: "Car, fuel or train", comida: "Household groceries", salud: "Doctor, pharmacy and insurance", restaurantes: "Eating out and delivery", ropa: "Clothing, haircuts and more", entretenimiento: "Cinema, games and events" };
+  const categoryEnglish = { hogar: "Home", suministros: "Household utilities", telefonia: "Mobile phone", transporte: "Transport", comida: "Groceries", salud: "Health", restaurantes: "Restaurants", ropa: "Clothing", entretenimiento: "Entertainment", mascotas: "Pets", educacion: "Education & training", viajes: "Travel", regalos: "Gifts & donations", familia: "Family & care", seguros: "Insurance & taxes", mantenimiento: "Home maintenance", cuidado_personal: "Personal care", trabajo: "Work expenses", imprevistos: "Other & unexpected" };
+  const categoryHelpEnglish = { hogar: "Rent or mortgage", suministros: "Power, water, gas and home internet", telefonia: "Mobile plan and phone", transporte: "Car, fuel or train", comida: "Household groceries", salud: "Doctor, pharmacy and insurance", restaurantes: "Eating out and delivery", ropa: "Clothing and footwear", entretenimiento: "Cinema, games and events", mascotas: "Food, vet and pet care", educacion: "Courses, books and studies", viajes: "Transport, accommodation and holidays", regalos: "Gifts, support and donations", familia: "Children, care and family support", seguros: "General insurance, fees and taxes", mantenimiento: "Repairs, furniture and cleaning", cuidado_personal: "Haircuts, hygiene and cosmetics", trabajo: "Equipment, clothing and tools", imprevistos: "Expenses that do not fit elsewhere" };
 
   const frecuenciaActiva = frecuencias.find((f) => f.id === frecuencia);
   const ingresoMensual = Math.round((Number(ingreso) || 0) * frecuenciaActiva.factor);
