@@ -18,6 +18,7 @@ import {
   Eye,
   Film,
   Home,
+  HeartPulse,
   Monitor,
   LogOut,
   Palette,
@@ -46,6 +47,7 @@ const iconos = {
   electricidad: Sparkles,
   suministros: Wifi,
   telefonia: Smartphone,
+  salud: HeartPulse,
   ropa: ShoppingBasket,
 };
 

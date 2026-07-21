@@ -312,3 +312,24 @@ html[data-theme="dark"] .month-navigator>button { color:#9eafc1; }
 html[data-theme="dark"] .month-navigator>button:hover:not(:disabled) { background:#223250;color:#aebcff; }
 html[data-theme="dark"] .month-navigator>span { color:var(--dark-text)!important; }
 html[data-theme="dark"] .demo-date-field input { border-color:var(--dark-border);background:var(--dark-field);color:var(--dark-text);color-scheme:dark; }
+
+/* Campos del modal: Safari aplica texto claro por color-scheme, así que el
+   fondo debe pertenecer también al tema oscuro. */
+html[data-theme="dark"] .demo-modal input,
+html[data-theme="dark"] .demo-modal select {
+  border-color: var(--dark-border);
+  background: var(--dark-field);
+  color: var(--dark-text);
+  -webkit-text-fill-color: var(--dark-text);
+  caret-color: #9fb0ff;
+}
+html[data-theme="dark"] .demo-modal input::placeholder {
+  color: #8799ad;
+  -webkit-text-fill-color: #8799ad;
+}
+html[data-theme="dark"] .demo-modal input:-webkit-autofill,
+html[data-theme="dark"] .demo-modal input:-webkit-autofill:hover,
+html[data-theme="dark"] .demo-modal input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--dark-field) inset;
+  -webkit-text-fill-color: var(--dark-text);
+}

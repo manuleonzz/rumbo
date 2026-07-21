@@ -27,6 +27,7 @@ import {
   Film,
   Flag,
   Home,
+  HeartPulse,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -54,12 +55,13 @@ import {
 
 const MONEDIN_IMG = `${import.meta.env.BASE_URL}monedin.png`;
 
-const iconos = { hogar: Home, electricidad: Wifi, suministros: Wifi, telefonia: Smartphone, comida: ShoppingBasket, transporte: Car, ocio: Coffee, restaurantes: Utensils, ropa: ShoppingBasket, entretenimiento: Film, suscripciones: CreditCard, deudas: WalletCards };
+const iconos = { hogar: Home, electricidad: Wifi, suministros: Wifi, telefonia: Smartphone, salud: HeartPulse, comida: ShoppingBasket, transporte: Car, ocio: Coffee, restaurantes: Utensils, ropa: ShoppingBasket, entretenimiento: Film, suscripciones: CreditCard, deudas: WalletCards };
 
 const categoriasIniciales = [
   { id: "hogar", nombre: "Hogar", usado: 617, limite: 700, color: "#5771e5" },
   { id: "comida", nombre: "Comida", usado: 268, limite: 400, color: "#26a889" },
   { id: "transporte", nombre: "Transporte", usado: 194, limite: 300, color: "#eea83d" },
+  { id: "salud", nombre: "Salud", usado: 0, limite: 120, color: "#d95b7a" },
   { id: "ocio", nombre: "Ocio", usado: 126.5, limite: 220, color: "#e56d7a" },
 ];
 
@@ -89,6 +91,10 @@ function limpiarDatosReales(snapshot) {
   const versionDatos = Number(limpio.versionDatos || 0);
   const movimientosGuardados = Array.isArray(limpio.movimientos) ? limpio.movimientos : [];
   const conteniaEjemplos = movimientosGuardados.some(esMovimientoDeEjemplo);
+
+  if (Array.isArray(limpio.categorias)) {
+    limpio.categorias = limpio.categorias.map((categoria) => ({ ...categoria }));
+  }
 
   const movimientosReales = movimientosGuardados
     .filter((movimiento) => !esMovimientoDeEjemplo(movimiento))
@@ -126,6 +132,14 @@ function limpiarDatosReales(snapshot) {
       limpio.categorias.push({ id: "telefonia", nombre: "Telefonía", usado: 0, limite: 0, color: "#359cc4" });
     }
     limpio.versionDatos = 5;
+  }
+  if (versionDatos < 6 && Array.isArray(limpio.categorias)) {
+    if (!limpio.categorias.some((categoria) => categoria.id === "salud")) {
+      const salud = { id: "salud", nombre: "Salud", usado: 0, limite: 0, color: "#d95b7a" };
+      const indiceRestaurantes = limpio.categorias.findIndex((categoria) => categoria.id === "restaurantes");
+      limpio.categorias.splice(indiceRestaurantes >= 0 ? indiceRestaurantes : limpio.categorias.length, 0, salud);
+    }
+    limpio.versionDatos = 6;
   }
   return limpio;
 }
@@ -278,7 +292,7 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
 
   useEffect(() => {
     if (!cloudData || configurando) return;
-    cloudData.setKey("rumbo_v2", { versionDatos: 5, configurado: true, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias: categorias.map((categoria) => ({ ...categoria, usado: 0 })), movimientos, servicios, pagosPrevistos, metas, deudas });
+    cloudData.setKey("rumbo_v2", { versionDatos: 6, configurado: true, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias: categorias.map((categoria) => ({ ...categoria, usado: 0 })), movimientos, servicios, pagosPrevistos, metas, deudas });
   }, [configurando, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias, movimientos, servicios, pagosPrevistos, metas, deudas]);
 
   useEffect(() => {
@@ -467,7 +481,7 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
     setDeudas(nuevasDeudas);
     if (cloudData) {
       await cloudData.setKey("rumbo_v2", {
-        versionDatos: 5,
+        versionDatos: 6,
         configurado: true,
         frecuenciaCobro: frecuencia,
         ingresoPorPago: Number(ingresoPorPago || 0),

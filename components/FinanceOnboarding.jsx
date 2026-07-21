@@ -12,6 +12,7 @@ import {
   Clock3,
   Film,
   Home,
+  HeartPulse,
   Lightbulb,
   Plus,
   ReceiptText,
@@ -46,6 +47,7 @@ const categoriasBase = [
   { id: "telefonia", nombre: "Telefonía", ayuda: "Tarifa móvil y teléfono", importe: 35, color: "#359cc4", icono: Smartphone },
   { id: "transporte", nombre: "Transporte", ayuda: "Coche, gasolina o tren", importe: 300, color: "#eea83d", icono: Car },
   { id: "comida", nombre: "Supermercado", ayuda: "Compra para casa", importe: 400, color: "#26a889", icono: ShoppingBasket },
+  { id: "salud", nombre: "Salud", ayuda: "Médico, farmacia y seguro", importe: 100, color: "#d95b7a", icono: HeartPulse },
   { id: "restaurantes", nombre: "Restaurantes", ayuda: "Comer fuera y delivery", importe: 150, color: "#e56d7a", icono: Utensils },
   { id: "ropa", nombre: "Ropa y cuidado", ayuda: "Ropa, peluquería y otros", importe: 100, color: "#3d9cc8", icono: Shirt },
   { id: "entretenimiento", nombre: "Entretenimiento", ayuda: "Cine, juegos y eventos", importe: 120, color: "#ef7d4f", icono: Film },
@@ -133,8 +135,8 @@ export default function FinanceOnboarding({ onComplete, onCancel, settings, isDe
   const [deudas, setDeudas] = useState([]);
   const [deudaBorrador, setDeudaBorrador] = useState({ tipo: "coche", nombre: "", saldo: "", cuota: "", tae: "" });
   const tr = (es, en) => settings.language === "en" ? en : es;
-  const categoryEnglish = { hogar: "Home", suministros: "Household utilities", telefonia: "Mobile phone", transporte: "Transport", comida: "Groceries", restaurantes: "Restaurants", ropa: "Clothing & care", entretenimiento: "Entertainment" };
-  const categoryHelpEnglish = { hogar: "Rent or mortgage", suministros: "Power, water, gas and home internet", telefonia: "Mobile plan and phone", transporte: "Car, fuel or train", comida: "Household groceries", restaurantes: "Eating out and delivery", ropa: "Clothing, haircuts and more", entretenimiento: "Cinema, games and events" };
+  const categoryEnglish = { hogar: "Home", suministros: "Household utilities", telefonia: "Mobile phone", transporte: "Transport", comida: "Groceries", salud: "Health", restaurantes: "Restaurants", ropa: "Clothing & care", entretenimiento: "Entertainment" };
+  const categoryHelpEnglish = { hogar: "Rent or mortgage", suministros: "Power, water, gas and home internet", telefonia: "Mobile plan and phone", transporte: "Car, fuel or train", comida: "Household groceries", salud: "Doctor, pharmacy and insurance", restaurantes: "Eating out and delivery", ropa: "Clothing, haircuts and more", entretenimiento: "Cinema, games and events" };
 
   const frecuenciaActiva = frecuencias.find((f) => f.id === frecuencia);
   const ingresoMensual = Math.round((Number(ingreso) || 0) * frecuenciaActiva.factor);
