@@ -10,6 +10,7 @@ import { actualizarPagoPrevisto, buscarMovimientoDePago, crearPagosPrevistos, el
 import { crearGraficaBalance } from "../src/lib/balance";
 import { migrarCategoriasRecomendadas } from "../src/lib/categories";
 import { actualizarMovimiento } from "../src/lib/movements";
+import { recuperarServiciosGuardados, SERVICIOS_CATALOGO } from "../src/lib/subscriptions";
 import {
   ArrowDownRight,
   ArrowLeft,
@@ -186,6 +187,15 @@ function limpiarDatosReales(snapshot) {
   if (versionDatos < 9) {
     limpio.pagosPrevistos = migrarPagosPrevistos(limpio.pagosPrevistos, limpio.categorias || [], limpio.servicios || []);
     limpio.versionDatos = 9;
+  }
+  if (versionDatos < 10) {
+    limpio.servicios = recuperarServiciosGuardados({
+      servicios: limpio.servicios,
+      pagosPrevistos: limpio.pagosPrevistos,
+      movimientos: limpio.movimientos,
+    });
+    limpio.pagosPrevistos = migrarPagosPrevistos(limpio.pagosPrevistos, limpio.categorias || [], limpio.servicios);
+    limpio.versionDatos = 10;
   }
   return limpio;
 }
@@ -388,7 +398,7 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
 
   useEffect(() => {
     if (!cloudData || configurando) return;
-    cloudData.setKey("rumbo_v2", { versionDatos: 9, configurado: true, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias: categorias.map((categoria) => ({ ...categoria, usado: 0 })), movimientos, servicios, pagosPrevistos, metas, deudas });
+    cloudData.setKey("rumbo_v2", { versionDatos: 10, configurado: true, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias: categorias.map((categoria) => ({ ...categoria, usado: 0 })), movimientos, servicios, pagosPrevistos, metas, deudas });
   }, [configurando, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias, movimientos, servicios, pagosPrevistos, metas, deudas]);
 
   useEffect(() => {
@@ -595,7 +605,7 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
     setDeudas(nuevasDeudas);
     if (cloudData) {
       await cloudData.setKey("rumbo_v2", {
-        versionDatos: 9,
+        versionDatos: 10,
         configurado: true,
         frecuenciaCobro: frecuencia,
         ingresoPorPago: Number(ingresoPorPago || 0),
@@ -687,6 +697,7 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
             <SubscriptionsPage
               language={settings.language}
               pagos={pagosPrevistos}
+              categorias={categorias}
               periodo={periodoActivo}
               movimientos={movimientos}
               onChange={sincronizarSuscripciones}
@@ -913,10 +924,11 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
   );
 }
 
-function SubscriptionsPage({ language, pagos, periodo, movimientos, onChange, onToggle, onPeriodo, onBack, onNotify }) {
+function SubscriptionsPage({ language, pagos, categorias, periodo, movimientos, onChange, onToggle, onPeriodo, onBack, onNotify }) {
   const tr = (es, en) => language === "en" ? en : es;
   const [editor, setEditor] = useState(null);
   const [error, setError] = useState("");
+  const [recuperacion, setRecuperacion] = useState([]);
   const suscripciones = pagos
     .filter((pago) => pago.tipo === "suscripcion")
     .map((pago) => ({ ...pago, movimiento: buscarMovimientoDePago(pago, movimientos, periodo) }))
@@ -926,6 +938,32 @@ function SubscriptionsPage({ language, pagos, periodo, movimientos, onChange, on
   const pagadas = activas.filter((pago) => pago.movimiento);
   const totalMensual = activas.reduce((total, pago) => total + Number(pago.importe || 0), 0);
   const periodoFuturo = periodo > periodoActual();
+  const totalAnterior = Number(categorias.find((categoria) => categoria.id === "suscripciones")?.limite || 0);
+
+  const alternarRecuperacion = (servicio) => setRecuperacion((actuales) => actuales.some((item) => item.id === servicio.id)
+    ? actuales.filter((item) => item.id !== servicio.id)
+    : [...actuales, { ...servicio, diaCobro: 1 }]);
+
+  const actualizarRecuperacion = (id, campo, valor) => setRecuperacion((actuales) => actuales.map((item) => item.id === id ? { ...item, [campo]: valor } : item));
+
+  const guardarRecuperacion = () => {
+    const recuperadas = recuperacion
+      .map((servicio) => ({
+        id: `suscripcion-${servicio.id}`,
+        nombre: servicio.nombre,
+        importe: Number(String(servicio.precio).replace(",", ".")),
+        diaCobro: Math.min(31, Math.max(1, Number(servicio.diaCobro) || 1)),
+        categoria: "suscripciones",
+        tipo: "suscripcion",
+        fijo: true,
+        activo: true,
+        color: servicio.color,
+        sigla: servicio.sigla,
+      }))
+      .filter((servicio) => Number(servicio.importe) > 0);
+    onChange([...pagos.filter((pago) => pago.tipo !== "suscripcion"), ...recuperadas]);
+    onNotify(tr(`${recuperadas.length} suscripciones recuperadas`, `${recuperadas.length} subscriptions recovered`));
+  };
 
   const abrirNueva = () => {
     setError("");
@@ -1033,7 +1071,17 @@ function SubscriptionsPage({ language, pagos, periodo, movimientos, onChange, on
           </div>
         </div>
       </article>;
-    })}</div> : <div className="subscriptions-empty"><CreditCard size={30} /><b>{tr("Todavía no tienes suscripciones", "You do not have subscriptions yet")}</b><span>{tr("Las que elegiste en el cuestionario aparecerán aquí. También puedes añadir una nueva.", "Subscriptions chosen during onboarding will appear here. You can also add a new one.")}</span><button onClick={abrirNueva}><Plus size={15} /> {tr("Añadir la primera", "Add your first")}</button></div>}
+    })}</div> : totalAnterior > 0 ? <section className="subscriptions-recovery">
+      <div className="subscriptions-recovery-head"><div><b>{tr("Recupera tus suscripciones", "Recover your subscriptions")}</b><span>{tr(`Tu configuración antigua conserva el total de ${euros.format(totalAnterior)}, pero no los nombres. Selecciónalas una sola vez y quedarán guardadas.`, `Your old setup keeps the ${euros.format(totalAnterior)} total, but not the service names. Select them once and they will stay saved.`)}</span></div><em>{recuperacion.length} {tr("seleccionadas", "selected")}</em></div>
+      <div className="subscriptions-recovery-grid">{SERVICIOS_CATALOGO.map((servicio) => {
+        const seleccionado = recuperacion.find((item) => item.id === servicio.id);
+        return <article className={seleccionado ? "activo" : ""} key={servicio.id} style={{ "--subscription-color": servicio.color }}>
+          <button type="button" onClick={() => alternarRecuperacion(servicio)}><span>{servicio.sigla}</span><div><b>{servicio.nombre}</b><small>{euros.format(Number(String(seleccionado?.precio ?? servicio.precio).replace(",", ".")) || 0)} / {tr("mes", "month")}</small></div><i><Check size={14} /></i></button>
+          {seleccionado && <div className="subscriptions-recovery-details"><label>€<input inputMode="decimal" value={String(seleccionado.precio).replace(".", ",")} onChange={(event) => { if (/^\d*[.,]?\d{0,2}$/.test(event.target.value)) actualizarRecuperacion(servicio.id, "precio", event.target.value); }} /></label><label>{tr("Día", "Day")}<input type="number" min="1" max="31" value={seleccionado.diaCobro} onChange={(event) => actualizarRecuperacion(servicio.id, "diaCobro", event.target.value)} /></label></div>}
+        </article>;
+      })}</div>
+      <button className="subscriptions-recovery-save" type="button" disabled={!recuperacion.length} onClick={guardarRecuperacion}><Check size={16} /> {tr("Guardar mis suscripciones", "Save my subscriptions")}</button>
+    </section> : <div className="subscriptions-empty"><CreditCard size={30} /><b>{tr("Todavía no tienes suscripciones", "You do not have subscriptions yet")}</b><span>{tr("Las que elijas en el cuestionario aparecerán aquí automáticamente. También puedes añadir una nueva.", "Subscriptions chosen during onboarding appear here automatically. You can also add a new one.")}</span><button onClick={abrirNueva}><Plus size={15} /> {tr("Añadir la primera", "Add your first")}</button></div>}
 
     {editor && <div className="demo-modal-backdrop" onMouseDown={cerrarEditor}>
       <form className="demo-modal subscription-editor" onSubmit={guardar} onMouseDown={(event) => event.stopPropagation()}>

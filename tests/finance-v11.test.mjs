@@ -4,6 +4,7 @@ import { crearGraficaBalance } from "../src/lib/balance.js";
 import { CATEGORIAS_RECOMENDADAS, migrarCategoriasRecomendadas } from "../src/lib/categories.js";
 import { actualizarMovimiento } from "../src/lib/movements.js";
 import { actualizarPagoPrevisto, buscarMovimientoDePago, crearPagosPrevistos, eliminarPagoPrevisto, migrarPagosPrevistos, normalizarPagosPrevistos } from "../src/lib/recurring.js";
+import { recuperarServiciosGuardados } from "../src/lib/subscriptions.js";
 
 test("la gráfica sube con ingresos y baja en rojo con gastos", () => {
   const grafica = crearGraficaBalance({
@@ -81,4 +82,14 @@ test("marcar una suscripción encuentra el movimiento del mes sin duplicarlo en 
   const movimientos = [{ id: 7, recurrenteId: chatgpt.id, nombre: "ChatGPT", categoria: "suscripciones", importe: 23, fechaISO: "2026-07-12" }];
   assert.equal(buscarMovimientoDePago(chatgpt, movimientos, "2026-07")?.id, 7);
   assert.equal(buscarMovimientoDePago(chatgpt, movimientos, "2026-08"), undefined);
+});
+
+test("la migración recupera suscripciones exactas de datos y movimientos anteriores", () => {
+  const recuperadas = recuperarServiciosGuardados({
+    servicios: [{ id: "chatgpt", nombre: "ChatGPT", precio: 22.99, diaCobro: 4, activo: true }],
+    pagosPrevistos: [{ id: "suscripcion-prime", nombre: "Amazon Prime", importe: 4.99, diaCobro: 8, categoria: "suscripciones", tipo: "suscripcion" }],
+    movimientos: [{ nombre: "Google One", importe: 2.99, fechaISO: "2026-07-18", categoria: "suscripciones" }],
+  });
+  assert.deepEqual(recuperadas.map((servicio) => servicio.nombre), ["ChatGPT", "Amazon Prime", "Google One"]);
+  assert.deepEqual(recuperadas.map((servicio) => servicio.diaCobro), [4, 8, 18]);
 });
