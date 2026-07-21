@@ -287,6 +287,29 @@ html[data-theme="dark"] .planned-expense-fixed>span { border-color:var(--dark-bo
 html[data-theme="dark"] .planned-expense-fixed small { color:#91a2b5; }
 html[data-theme="dark"] .planned-expense-fixed.activo { border-color:#2f6e5d;background:#17332d;color:#7be0c1; }
 
+/* Página de suscripciones */
+html[data-theme="dark"] .subscriptions-summary>article,
+html[data-theme="dark"] .subscriptions-toolbar,
+html[data-theme="dark"] .subscriptions-card-grid>article,
+html[data-theme="dark"] .subscriptions-empty { border-color:var(--dark-border);background:var(--dark-panel);color:var(--dark-text);box-shadow:none; }
+html[data-theme="dark"] .subscriptions-card-grid>article.pagada { border-color:#2f6e5d;background:linear-gradient(145deg,var(--dark-panel),#17332d); }
+html[data-theme="dark"] .subscriptions-card-grid>article.pausada { background:var(--dark-panel-soft); }
+html[data-theme="dark"] .subscription-card-brand { background:color-mix(in srgb,var(--subscription-color) 18%,#172536); }
+html[data-theme="dark"] .subscription-card-copy h2,
+html[data-theme="dark"] .subscriptions-card-grid>article>strong,
+html[data-theme="dark"] .subscriptions-empty>b { color:var(--dark-text); }
+html[data-theme="dark"] .subscription-card-copy p,
+html[data-theme="dark"] .subscriptions-toolbar small,
+html[data-theme="dark"] .subscriptions-empty>span { color:#93a4b7; }
+html[data-theme="dark"] .subscription-card-footer { border-color:#2a3a4a; }
+html[data-theme="dark"] .subscription-check,
+html[data-theme="dark"] .subscription-reactivate,
+html[data-theme="dark"] .subscription-card-actions>button { border-color:var(--dark-border);background:var(--dark-field);color:#b8c7d7; }
+html[data-theme="dark"] .subscription-check>span { border-color:#496075;background:#1a293b; }
+html[data-theme="dark"] .subscription-check.activo { border-color:#2f6e5d;background:#17332d;color:#7be0c1; }
+html[data-theme="dark"] .subscription-card-actions>button:hover { border-color:#566abf;background:#233250;color:#b9c5ff; }
+html[data-theme="dark"] .subscription-card-actions>button.delete:hover { border-color:#754452;background:#482a35;color:#ff9ca8; }
+
 /* Dashboard: modal close buttons and disabled actions */
 html[data-theme="dark"] .income-close,
 html[data-theme="dark"] .goal-modal-close,

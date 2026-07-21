@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { crearGraficaBalance } from "../src/lib/balance.js";
 import { CATEGORIAS_RECOMENDADAS, migrarCategoriasRecomendadas } from "../src/lib/categories.js";
 import { actualizarMovimiento } from "../src/lib/movements.js";
-import { actualizarPagoPrevisto, eliminarPagoPrevisto, migrarPagosPrevistos, normalizarPagosPrevistos } from "../src/lib/recurring.js";
+import { actualizarPagoPrevisto, buscarMovimientoDePago, crearPagosPrevistos, eliminarPagoPrevisto, migrarPagosPrevistos, normalizarPagosPrevistos } from "../src/lib/recurring.js";
 
 test("la gráfica sube con ingresos y baja en rojo con gastos", () => {
   const grafica = crearGraficaBalance({
@@ -64,4 +64,21 @@ test("la migración inicial recupera categorías recurrentes y suscripciones una
   const migrados = migrarPagosPrevistos([], [{ id: "hogar", nombre: "Hogar", limite: 617, color: "#5771e5" }], [{ id: "chatgpt", nombre: "ChatGPT", precio: 23, diaCobro: 12, activo: true }]);
   assert.deepEqual(migrados.map((pago) => pago.nombre), ["Hogar", "ChatGPT"]);
   assert.equal(migrarPagosPrevistos(migrados, [{ id: "hogar", nombre: "Hogar", limite: 617 }], [{ id: "chatgpt", nombre: "ChatGPT", precio: 23, diaCobro: 12 }]).length, 2);
+});
+
+test("las suscripciones elegidas en el cuestionario se convierten en checks independientes", () => {
+  const pagos = crearPagosPrevistos([], [
+    { id: "chatgpt", nombre: "ChatGPT", precio: 23, diaCobro: 12, activo: true },
+    { id: "amazon-prime", nombre: "Amazon Prime", precio: 4.99, diaCobro: 18, activo: true },
+    { id: "google-one", nombre: "Google One", precio: 2.99, diaCobro: 25, activo: true },
+  ]);
+  assert.deepEqual(pagos.map((pago) => pago.nombre), ["ChatGPT", "Amazon Prime", "Google One"]);
+  assert.ok(pagos.every((pago) => pago.tipo === "suscripcion" && pago.categoria === "suscripciones" && pago.fijo));
+});
+
+test("marcar una suscripción encuentra el movimiento del mes sin duplicarlo en otro mes", () => {
+  const [chatgpt] = crearPagosPrevistos([], [{ id: "chatgpt", nombre: "ChatGPT", precio: 23, diaCobro: 12, activo: true }]);
+  const movimientos = [{ id: 7, recurrenteId: chatgpt.id, nombre: "ChatGPT", categoria: "suscripciones", importe: 23, fechaISO: "2026-07-12" }];
+  assert.equal(buscarMovimientoDePago(chatgpt, movimientos, "2026-07")?.id, 7);
+  assert.equal(buscarMovimientoDePago(chatgpt, movimientos, "2026-08"), undefined);
 });

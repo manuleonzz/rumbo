@@ -544,6 +544,37 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
     window.setTimeout(() => setAviso(""), 3200);
   };
 
+  const sincronizarSuscripciones = (siguientesPagos) => {
+    const pagosNormalizados = normalizarPagosPrevistos(siguientesPagos);
+    const suscripciones = pagosNormalizados
+      .filter((pago) => pago.tipo === "suscripcion")
+      .map((pago) => ({
+        id: String(pago.id).replace(/^suscripcion-/, ""),
+        nombre: pago.nombre,
+        precio: Number(pago.importe),
+        diaCobro: Number(pago.diaCobro || 1),
+        sigla: pago.sigla || String(pago.nombre || "S").slice(0, 2).toUpperCase(),
+        color: pago.color || "#ef7d4f",
+        tipo: "personalizada",
+        activo: pago.activo !== false,
+      }));
+    const totalActivo = Number(suscripciones
+      .filter((servicio) => servicio.activo !== false)
+      .reduce((total, servicio) => total + Number(servicio.precio || 0), 0)
+      .toFixed(2));
+
+    setPagosPrevistos(pagosNormalizados);
+    setServicios(suscripciones);
+    setCategorias((actuales) => {
+      const existe = actuales.some((categoria) => categoria.id === "suscripciones");
+      if (existe) return actuales.map((categoria) => categoria.id === "suscripciones"
+        ? { ...categoria, nombre: "Suscripciones", limite: totalActivo, color: categoria.color || "#ef7d4f" }
+        : categoria);
+      if (!suscripciones.length) return actuales;
+      return [...actuales, { id: "suscripciones", nombre: "Suscripciones", limite: totalActivo, usado: 0, color: "#ef7d4f" }];
+    });
+  };
+
   const completarConfiguracion = async ({ frecuencia, ingresoPorPago, categorias: nuevasCategorias, servicios: nuevosServicios = [], metas: nuevasMetas = [], deudas: nuevasDeudas = [] }) => {
     setFrecuenciaCobro(frecuencia);
     setIngresoPorPago(Number(ingresoPorPago || 0));
@@ -597,7 +628,8 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
           <button className={vista === "resumen" ? "activo" : ""} onClick={() => { setVista("resumen"); setMenu(false); }}><LayoutDashboard size={18} /> {tr("Resumen", "Overview")}</button>
           <button onClick={() => setIngresosAbiertos(true)}><WalletCards size={18} /> {tr("Ingresos", "Income")}</button>
           <button className={vista === "movimientos" ? "activo" : ""} onClick={() => { setVista("movimientos"); setMenu(false); }}><CreditCard size={18} /> {tr("Movimientos", "Transactions")} <i>{movimientosDelPeriodo.length}</i></button>
-          <button className={vista === "previstos" ? "activo" : ""} onClick={() => { setVista("previstos"); setMenu(false); }}><ReceiptText size={18} /> {tr("Gastos previstos", "Planned expenses")} {pagosPrevistos.filter((pago) => pago.activo !== false).length > 0 && <i>{pagosPrevistos.filter((pago) => pago.activo !== false).length}</i>}</button>
+          <button className={vista === "previstos" ? "activo" : ""} onClick={() => { setVista("previstos"); setMenu(false); }}><ReceiptText size={18} /> {tr("Gastos previstos", "Planned expenses")} {pagosPrevistos.filter((pago) => pago.tipo !== "suscripcion" && pago.activo !== false).length > 0 && <i>{pagosPrevistos.filter((pago) => pago.tipo !== "suscripcion" && pago.activo !== false).length}</i>}</button>
+          <button className={vista === "suscripciones" ? "activo" : ""} onClick={() => { setVista("suscripciones"); setMenu(false); }}><CreditCard size={18} /> {tr("Suscripciones", "Subscriptions")} {pagosPrevistos.filter((pago) => pago.tipo === "suscripcion" && pago.activo !== false).length > 0 && <i>{pagosPrevistos.filter((pago) => pago.tipo === "suscripcion" && pago.activo !== false).length}</i>}</button>
           <button className={vista === "deudas" ? "activo" : ""} onClick={() => { setVista("deudas"); setMenu(false); }}><WalletCards size={18} /> {tr("Deudas", "Debts")} {deudas.length > 0 && <i>{deudas.length}</i>}</button>
           <button className={vista === "presupuestos" ? "activo" : ""} onClick={() => { setVista("presupuestos"); setMenu(false); }}><BarChart3 size={18} /> {tr("Presupuestos", "Budgets")}</button>
           <button className={vista === "metas" ? "activo" : ""} onClick={() => { setVista("metas"); setMenu(false); }}><Target size={18} /> {tr("Metas", "Goals")} {metas.length > 0 && <i>{metas.length}</i>}</button>
@@ -646,6 +678,18 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
               periodo={periodoActivo}
               movimientos={movimientos}
               onChange={setPagosPrevistos}
+              onToggle={alternarPagoPrevisto}
+              onPeriodo={setPeriodoActivo}
+              onBack={() => setVista("resumen")}
+              onNotify={(mensaje) => { setAviso(mensaje); window.setTimeout(() => setAviso(""), 3200); }}
+            />
+          ) : vista === "suscripciones" ? (
+            <SubscriptionsPage
+              language={settings.language}
+              pagos={pagosPrevistos}
+              periodo={periodoActivo}
+              movimientos={movimientos}
+              onChange={sincronizarSuscripciones}
               onToggle={alternarPagoPrevisto}
               onPeriodo={setPeriodoActivo}
               onBack={() => setVista("resumen")}
@@ -869,14 +913,155 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
   );
 }
 
+function SubscriptionsPage({ language, pagos, periodo, movimientos, onChange, onToggle, onPeriodo, onBack, onNotify }) {
+  const tr = (es, en) => language === "en" ? en : es;
+  const [editor, setEditor] = useState(null);
+  const [error, setError] = useState("");
+  const suscripciones = pagos
+    .filter((pago) => pago.tipo === "suscripcion")
+    .map((pago) => ({ ...pago, movimiento: buscarMovimientoDePago(pago, movimientos, periodo) }))
+    .sort((a, b) => Number(a.diaCobro || 1) - Number(b.diaCobro || 1) || a.nombre.localeCompare(b.nombre));
+  const activas = suscripciones.filter((pago) => pago.activo !== false);
+  const pausadas = suscripciones.filter((pago) => pago.activo === false);
+  const pagadas = activas.filter((pago) => pago.movimiento);
+  const totalMensual = activas.reduce((total, pago) => total + Number(pago.importe || 0), 0);
+  const periodoFuturo = periodo > periodoActual();
+
+  const abrirNueva = () => {
+    setError("");
+    setEditor({ id: null, nombre: "", importe: "", diaCobro: "1", activo: true, color: "#ef7d4f" });
+  };
+  const abrirEditar = (pago) => {
+    setError("");
+    setEditor({ ...pago, importe: String(Number(pago.importe || 0)).replace(".", ","), diaCobro: String(pago.diaCobro || 1) });
+  };
+  const cerrarEditor = () => { setEditor(null); setError(""); };
+
+  const guardar = (event) => {
+    event.preventDefault();
+    const nombre = String(editor.nombre || "").trim();
+    const importe = Number(String(editor.importe).replace(",", "."));
+    const diaCobro = Number(editor.diaCobro);
+    if (!nombre) return setError(tr("Escribe el nombre de la suscripción.", "Enter the subscription name."));
+    if (!Number.isFinite(importe) || importe <= 0) return setError(tr("Introduce un importe mayor que 0 €.", "Enter an amount greater than €0."));
+    if (!Number.isInteger(diaCobro) || diaCobro < 1 || diaCobro > 31) return setError(tr("El día de cobro debe estar entre 1 y 31.", "The billing day must be between 1 and 31."));
+
+    const limpia = {
+      nombre,
+      importe,
+      diaCobro,
+      categoria: "suscripciones",
+      tipo: "suscripcion",
+      fijo: true,
+      activo: editor.activo !== false,
+      color: editor.color || "#ef7d4f",
+      sigla: nombre.slice(0, 2).toUpperCase(),
+    };
+    const siguientes = editor.id
+      ? actualizarPagoPrevisto(pagos, editor.id, limpia)
+      : [...pagos, { ...limpia, id: `suscripcion-personalizada-${Date.now()}` }];
+    onChange(siguientes);
+    onNotify(editor.id ? tr("Suscripción actualizada", "Subscription updated") : tr("Suscripción añadida", "Subscription added"));
+    cerrarEditor();
+  };
+
+  const alternarActivo = (pago) => {
+    const activo = pago.activo === false;
+    onChange(actualizarPagoPrevisto(pagos, pago.id, { activo }));
+    onNotify(activo
+      ? tr(`${pago.nombre} vuelve a estar activa`, `${pago.nombre} is active again`)
+      : tr(`${pago.nombre} se ha pausado`, `${pago.nombre} has been paused`));
+  };
+
+  const eliminar = (pago) => {
+    if (!window.confirm(tr(
+      `¿Cancelar “${pago.nombre}” en Rumbo? Los movimientos ya registrados permanecerán en el historial.`,
+      `Cancel “${pago.nombre}” in Rumbo? Existing transactions will remain in your history.`,
+    ))) return;
+    onChange(eliminarPagoPrevisto(pagos, pago.id));
+    onNotify(tr("Suscripción eliminada; el historial se conserva", "Subscription removed; history was kept"));
+  };
+
+  return <section className="subscriptions-page">
+    <header className="subscriptions-page-head">
+      <div>
+        <button onClick={onBack}><ArrowLeft size={15} /> {tr("Volver al resumen", "Back to overview")}</button>
+        <span>{tr("TUS PAGOS DIGITALES", "YOUR DIGITAL PAYMENTS")}</span>
+        <h1>{tr("Suscripciones", "Subscriptions")}</h1>
+        <p>{tr("Marca cada servicio cuando llegue el cobro y Rumbo creará el movimiento automáticamente.", "Check each service when it is charged and Rumbo will create the transaction automatically.")}</p>
+      </div>
+      <button className="subscriptions-add" onClick={abrirNueva}><Plus size={17} /> {tr("Añadir suscripción", "Add subscription")}</button>
+    </header>
+
+    <div className="subscriptions-summary">
+      <article><span><CreditCard size={18} /></span><div><small>{tr("Suscripciones activas", "Active subscriptions")}</small><b>{activas.length}</b></div></article>
+      <article><span><CalendarDays size={18} /></span><div><small>{tr("Total mensual", "Monthly total")}</small><b>{euros.format(totalMensual)}</b></div></article>
+      <article><span><CheckCircle2 size={18} /></span><div><small>{tr("Pagadas en", "Paid in")} {etiquetaPeriodo(periodo, language)}</small><b>{pagadas.length} / {activas.length}</b></div></article>
+      <article><span><RotateCcw size={18} /></span><div><small>{tr("Pausadas", "Paused")}</small><b>{pausadas.length}</b></div></article>
+    </div>
+
+    <div className="subscriptions-toolbar">
+      <div><b>{tr("Tus servicios", "Your services")}</b><small>{tr("Solo aparecen las suscripciones elegidas por ti.", "Only subscriptions selected by you appear here.")}</small></div>
+      <MonthNavigator periodo={periodo} onChange={onPeriodo} language={language} />
+    </div>
+
+    {suscripciones.length ? <div className="subscriptions-card-grid">{suscripciones.map((pago) => {
+      const pagada = Boolean(pago.movimiento);
+      const pausada = pago.activo === false;
+      return <article className={`${pagada ? "pagada" : ""} ${pausada ? "pausada" : ""}`} key={pago.id} style={{ "--subscription-color": pago.color || "#ef7d4f" }}>
+        <div className="subscription-card-top">
+          <span className="subscription-card-brand">{pago.sigla || String(pago.nombre || "S").slice(0, 2).toUpperCase()}</span>
+          <em className={pausada ? "pausada" : pagada ? "pagada" : "pendiente"}>{pausada ? tr("Pausada", "Paused") : pagada ? tr("Pagada", "Paid") : tr("Pendiente", "Pending")}</em>
+        </div>
+        <div className="subscription-card-copy"><h2>{pago.nombre}</h2><p>{pagada
+          ? tr(`Registrada el ${formatearFecha(pago.movimiento.fechaISO, language, { corta: true })}`, `Recorded ${formatearFecha(pago.movimiento.fechaISO, language, { corta: true })}`)
+          : tr(`Cobro mensual · día ${pago.diaCobro || 1}`, `Monthly charge · day ${pago.diaCobro || 1}`)}</p></div>
+        <strong>{euros.format(pagada ? pago.movimiento.importe : pago.importe)} <small>/ {tr("mes", "month")}</small></strong>
+        <div className="subscription-card-footer">
+          {!pausada && <button
+            type="button"
+            className={pagada ? "subscription-check activo" : "subscription-check"}
+            disabled={periodoFuturo && !pagada}
+            onClick={() => onToggle(pago)}
+            aria-label={pagada ? tr(`Deshacer pago de ${pago.nombre}`, `Undo ${pago.nombre} payment`) : tr(`Registrar pago de ${pago.nombre}`, `Record ${pago.nombre} payment`)}
+          ><span><Check size={15} /></span>{pagada ? tr("Pagada este mes", "Paid this month") : periodoFuturo ? tr("Disponible al comenzar el mes", "Available when month starts") : tr("Marcar como pagada", "Mark as paid")}</button>}
+          {pausada && <button type="button" className="subscription-reactivate" onClick={() => alternarActivo(pago)}><RotateCcw size={15} /> {tr("Reactivar", "Reactivate")}</button>}
+          <div className="subscription-card-actions">
+            <button onClick={() => abrirEditar(pago)} title={tr("Editar", "Edit")}><Pencil size={15} /></button>
+            {!pausada && <button onClick={() => alternarActivo(pago)} title={tr("Pausar", "Pause")}><RotateCcw size={15} /></button>}
+            <button className="delete" onClick={() => eliminar(pago)} title={tr("Eliminar", "Delete")}><Trash2 size={15} /></button>
+          </div>
+        </div>
+      </article>;
+    })}</div> : <div className="subscriptions-empty"><CreditCard size={30} /><b>{tr("Todavía no tienes suscripciones", "You do not have subscriptions yet")}</b><span>{tr("Las que elegiste en el cuestionario aparecerán aquí. También puedes añadir una nueva.", "Subscriptions chosen during onboarding will appear here. You can also add a new one.")}</span><button onClick={abrirNueva}><Plus size={15} /> {tr("Añadir la primera", "Add your first")}</button></div>}
+
+    {editor && <div className="demo-modal-backdrop" onMouseDown={cerrarEditor}>
+      <form className="demo-modal subscription-editor" onSubmit={guardar} onMouseDown={(event) => event.stopPropagation()}>
+        <button type="button" className="demo-modal-close" onClick={cerrarEditor}><X size={18} /></button>
+        <span className="demo-modal-icon subscriptions"><CreditCard size={22} /></span>
+        <h2>{editor.id ? tr("Editar suscripción", "Edit subscription") : tr("Nueva suscripción", "New subscription")}</h2>
+        <p>{tr("Indica el importe y el día habitual del cobro.", "Enter the usual amount and billing day.")}</p>
+        <label>{tr("Nombre del servicio", "Service name")}<input autoFocus value={editor.nombre} placeholder={tr("Ej. Amazon Prime", "E.g. Amazon Prime")} onChange={(event) => { setEditor({ ...editor, nombre: event.target.value }); setError(""); }} /></label>
+        <div className="demo-form-row">
+          <label>{tr("Importe mensual", "Monthly amount")}<input inputMode="decimal" value={editor.importe} placeholder="0,00" onChange={(event) => { if (/^\d*[.,]?\d{0,2}$/.test(event.target.value)) { setEditor({ ...editor, importe: event.target.value }); setError(""); } }} /></label>
+          <label>{tr("Día de cobro", "Billing day")}<input type="number" min="1" max="31" value={editor.diaCobro} onChange={(event) => { setEditor({ ...editor, diaCobro: event.target.value }); setError(""); }} /></label>
+        </div>
+        {error && <div className="demo-form-error"><CircleHelp size={15} /> {error}</div>}
+        <button className="demo-modal-submit" type="submit">{editor.id ? tr("Guardar cambios", "Save changes") : tr("Añadir suscripción", "Add subscription")}</button>
+      </form>
+    </div>}
+  </section>;
+}
+
 function PlannedExpensesPage({ language, pagos, categorias, setCategorias, periodo, movimientos, onChange, onToggle, onPeriodo, onBack, onNotify }) {
   const tr = (es, en) => language === "en" ? en : es;
   const [editor, setEditor] = useState(null);
   const [error, setError] = useState("");
-  const activos = pagos.filter((pago) => pago.activo !== false);
-  const pausados = pagos.filter((pago) => pago.activo === false);
+  const gastosPrevistos = pagos.filter((pago) => pago.tipo !== "suscripcion");
+  const activos = gastosPrevistos.filter((pago) => pago.activo !== false);
+  const pausados = gastosPrevistos.filter((pago) => pago.activo === false);
   const totalMensual = activos.reduce((total, pago) => total + Number(pago.importe || 0), 0);
-  const filas = pagos.map((pago) => ({ ...pago, movimiento: buscarMovimientoDePago(pago, movimientos, periodo) }))
+  const filas = gastosPrevistos.map((pago) => ({ ...pago, movimiento: buscarMovimientoDePago(pago, movimientos, periodo) }))
     .sort((a, b) => Number(a.diaCobro || 1) - Number(b.diaCobro || 1) || a.nombre.localeCompare(b.nombre));
 
   const categoriaPorId = (id) => categorias.find((categoria) => categoria.id === id);
@@ -898,27 +1083,22 @@ function PlannedExpensesPage({ language, pagos, categorias, setCategorias, perio
     if (!Number.isFinite(importe) || importe <= 0) return setError(tr("Introduce un importe mayor que 0 €.", "Enter an amount greater than €0."));
     if (!Number.isInteger(diaCobro) || diaCobro < 1 || diaCobro > 31) return setError(tr("El día de cobro debe estar entre 1 y 31.", "Billing day must be between 1 and 31."));
 
-    const esSuscripcion = editor.tipo === "suscripcion";
-    const categoria = esSuscripcion ? "suscripciones" : editor.categoria;
-    if (!esSuscripcion && !categoriaPorId(categoria)) return setError(tr("Selecciona una categoría válida.", "Select a valid category."));
-    if (esSuscripcion && !categoriaPorId("suscripciones")) {
-      setCategorias((actuales) => [...actuales, { id: "suscripciones", nombre: "Suscripciones", limite: 0, usado: 0, color: "#ef7d4f" }]);
-    }
+    const categoria = editor.categoria;
+    if (!categoriaPorId(categoria)) return setError(tr("Selecciona una categoría válida.", "Select a valid category."));
 
     const limpio = {
       nombre: String(editor.nombre).trim(),
       importe,
       diaCobro,
       categoria,
-      tipo: esSuscripcion ? "suscripcion" : "previsto",
-      fijo: esSuscripcion ? true : Boolean(editor.fijo),
+      tipo: "previsto",
+      fijo: Boolean(editor.fijo),
       activo: editor.activo !== false,
-      color: esSuscripcion ? (editor.color || "#ef7d4f") : (categoriaPorId(categoria)?.color || editor.color || "#5771e5"),
-      sigla: esSuscripcion ? String(editor.nombre).trim().slice(0, 2).toUpperCase() : undefined,
+      color: categoriaPorId(categoria)?.color || editor.color || "#5771e5",
     };
     const siguientes = editor.id
       ? actualizarPagoPrevisto(pagos, editor.id, limpio)
-      : [...pagos, { ...limpio, id: `${esSuscripcion ? "suscripcion" : "previsto"}-personalizado-${Date.now()}` }];
+      : [...pagos, { ...limpio, id: `previsto-personalizado-${Date.now()}` }];
     onChange(normalizarPagosPrevistos(siguientes));
     onNotify(editor.id ? tr("Gasto previsto actualizado", "Planned expense updated") : tr("Gasto previsto añadido", "Planned expense added"));
     cerrarEditor();
@@ -945,7 +1125,7 @@ function PlannedExpensesPage({ language, pagos, categorias, setCategorias, perio
         <button onClick={onBack}><ArrowLeft size={15} /> {tr("Volver al resumen", "Back to overview")}</button>
         <span>{tr("PLANIFICACIÓN MENSUAL", "MONTHLY PLANNING")}</span>
         <h1>{tr("Gastos previstos", "Planned expenses")}</h1>
-        <p>{tr("Administra alquiler, suministros y suscripciones sin borrar los pagos que ya hiciste.", "Manage rent, utilities and subscriptions without deleting payments you already made.")}</p>
+        <p>{tr("Administra alquiler, suministros y otros pagos recurrentes sin borrar el historial.", "Manage rent, utilities and other recurring payments without deleting history.")}</p>
       </div>
       <button className="planned-expenses-add" onClick={abrirNuevo}><Plus size={17} /> {tr("Añadir gasto previsto", "Add planned expense")}</button>
     </header>
@@ -979,7 +1159,7 @@ function PlannedExpensesPage({ language, pagos, categorias, setCategorias, perio
           <button className="delete" onClick={() => eliminar(pago)} title={tr("Eliminar", "Delete")}><Trash2 size={15} /></button>
         </div>
       </article>;
-    })}</div> : <div className="planned-expenses-page-empty"><ReceiptText size={28} /><b>{tr("Todavía no tienes gastos previstos", "You have no planned expenses yet")}</b><span>{tr("Añade el alquiler, tus suministros o una suscripción.", "Add rent, utilities or a subscription.")}</span><button onClick={abrirNuevo}><Plus size={15} /> {tr("Añadir el primero", "Add your first")}</button></div>}
+    })}</div> : <div className="planned-expenses-page-empty"><ReceiptText size={28} /><b>{tr("Todavía no tienes gastos previstos", "You have no planned expenses yet")}</b><span>{tr("Añade el alquiler, la electricidad, el agua u otro pago recurrente.", "Add rent, electricity, water or another recurring payment.")}</span><button onClick={abrirNuevo}><Plus size={15} /> {tr("Añadir el primero", "Add your first")}</button></div>}
 
     {editor && <div className="demo-modal-backdrop" onMouseDown={cerrarEditor}>
       <form className="demo-modal planned-expense-editor" onSubmit={guardar} onMouseDown={(event) => event.stopPropagation()}>
@@ -987,14 +1167,13 @@ function PlannedExpensesPage({ language, pagos, categorias, setCategorias, perio
         <span className="demo-modal-icon planned"><ReceiptText size={22} /></span>
         <h2>{editor.id ? tr("Editar gasto previsto", "Edit planned expense") : tr("Nuevo gasto previsto", "New planned expense")}</h2>
         <p>{tr("Podrás modificarlo, pausarlo o quitarlo cuando cambie tu situación.", "You can edit, pause or remove it whenever your situation changes.")}</p>
-        <div className="planned-expense-type"><button type="button" className={editor.tipo === "previsto" ? "activo" : ""} onClick={() => setEditor({ ...editor, tipo: "previsto", fijo: false })}><Home size={16} /> {tr("Gasto recurrente", "Recurring expense")}</button><button type="button" className={editor.tipo === "suscripcion" ? "activo" : ""} onClick={() => setEditor({ ...editor, tipo: "suscripcion", fijo: true })}><CreditCard size={16} /> {tr("Suscripción", "Subscription")}</button></div>
         <label>{tr("Nombre", "Name")}<input autoFocus value={editor.nombre} placeholder={tr("Ej. Alquiler", "E.g. Rent")} onChange={(event) => { setEditor({ ...editor, nombre: event.target.value }); setError(""); }} /></label>
         <div className="demo-form-row">
           <label>{tr("Importe previsto", "Expected amount")}<input inputMode="decimal" value={editor.importe} placeholder="0,00" onChange={(event) => { if (/^\d*[.,]?\d{0,2}$/.test(event.target.value)) { setEditor({ ...editor, importe: event.target.value }); setError(""); } }} /></label>
           <label>{tr("Día de cobro", "Billing day")}<input type="number" min="1" max="31" value={editor.diaCobro} onChange={(event) => { setEditor({ ...editor, diaCobro: event.target.value }); setError(""); }} /></label>
         </div>
-        {editor.tipo !== "suscripcion" && <label>{tr("Categoría del movimiento", "Transaction category")}<select value={editor.categoria} onChange={(event) => setEditor({ ...editor, categoria: event.target.value })}>{categorias.filter((categoria) => categoria.id !== "suscripciones").map((categoria) => <option key={categoria.id} value={categoria.id}>{categoria.nombre}</option>)}</select></label>}
-        {editor.tipo !== "suscripcion" && <button type="button" className={editor.fijo ? "planned-expense-fixed activo" : "planned-expense-fixed"} onClick={() => setEditor({ ...editor, fijo: !editor.fijo })}><span><Check size={13} /></span><div><b>{tr("El importe siempre es exacto", "The amount is always exact")}</b><small>{tr("Si lo activas, el check registra el pago sin pedir confirmación.", "When enabled, the check records the payment without confirmation.")}</small></div></button>}
+        <label>{tr("Categoría del movimiento", "Transaction category")}<select value={editor.categoria} onChange={(event) => setEditor({ ...editor, categoria: event.target.value })}>{categorias.filter((categoria) => categoria.id !== "suscripciones").map((categoria) => <option key={categoria.id} value={categoria.id}>{categoria.nombre}</option>)}</select></label>
+        <button type="button" className={editor.fijo ? "planned-expense-fixed activo" : "planned-expense-fixed"} onClick={() => setEditor({ ...editor, fijo: !editor.fijo })}><span><Check size={13} /></span><div><b>{tr("El importe siempre es exacto", "The amount is always exact")}</b><small>{tr("Si lo activas, el check registra el pago sin pedir confirmación.", "When enabled, the check records the payment without confirmation.")}</small></div></button>
         {error && <div className="demo-form-error"><CircleHelp size={15} /> {error}</div>}
         <button className="demo-modal-submit" type="submit">{editor.id ? tr("Guardar cambios", "Save changes") : tr("Añadir gasto previsto", "Add planned expense")}</button>
       </form>
