@@ -364,6 +364,28 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
     setCategoriaMenu(false);
   };
 
+  const seleccionarCategoria = (categoriaId) => {
+    setForm((actual) => ({ ...actual, categoria: categoriaId }));
+    setFormError("");
+    setCategoriaMenu(false);
+  };
+
+  useEffect(() => {
+    if (!modal) return undefined;
+
+    const overflowAnterior = document.body.style.overflow;
+    const paddingAnterior = document.body.style.paddingRight;
+    const anchoBarra = window.innerWidth - document.documentElement.clientWidth;
+
+    document.body.style.overflow = "hidden";
+    if (anchoBarra > 0) document.body.style.paddingRight = `${anchoBarra}px`;
+
+    return () => {
+      document.body.style.overflow = overflowAnterior;
+      document.body.style.paddingRight = paddingAnterior;
+    };
+  }, [modal]);
+
   useEffect(() => {
     if (!cloudData || configurando) return;
     cloudData.setKey("rumbo_v2", { versionDatos: 9, configurado: true, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias: categorias.map((categoria) => ({ ...categoria, usado: 0 })), movimientos, servicios, pagosPrevistos, metas, deudas });
@@ -763,13 +785,13 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
             <div className="demo-form-row">
               <label>{tr("Importe", "Amount")}<input type="text" inputMode="decimal" placeholder="0,00" value={form.importe} onChange={(e) => { const valor = e.target.value; if (/^\d*[.,]?\d{0,2}$/.test(valor)) { setForm({ ...form, importe: valor }); setFormError(""); } }} /></label>
               <label className="demo-category-field">{tr("Categoría", "Category")}
-                <button type="button" className={categoriaMenu ? "demo-category-trigger abierto" : "demo-category-trigger"} onClick={() => setCategoriaMenu((abierto) => !abierto)}>
+                <button type="button" className={categoriaMenu ? "demo-category-trigger abierto" : "demo-category-trigger"} aria-expanded={categoriaMenu} aria-controls="movement-category-menu" onClick={() => setCategoriaMenu((abierto) => !abierto)}>
                   {categoriaSeleccionada && (() => { const Icono = iconos[categoriaSeleccionada.id] || CreditCard; return <span style={{ color: categoriaSeleccionada.color, background: `${categoriaSeleccionada.color}18` }}><Icono size={17} /></span>; })()}
                   <b>{categoriaSeleccionada?.nombre || "Seleccionar"}</b><ChevronDown size={16} />
                 </button>
-                {categoriaMenu && <div className="demo-category-menu">
+                {categoriaMenu && <div id="movement-category-menu" className="demo-category-menu" onWheelCapture={(event) => event.stopPropagation()}>
                   <div><b>¿En qué lo gastaste?</b><small>Elige una categoría</small></div>
-                  <section>{categorias.map((categoria) => { const Icono = iconos[categoria.id] || CreditCard; return <button type="button" className={form.categoria === categoria.id ? "seleccionada" : ""} key={categoria.id} onClick={() => { setForm({ ...form, categoria: categoria.id }); setCategoriaMenu(false); }}><span style={{ color: categoria.color, background: `${categoria.color}18` }}><Icono size={18} /></span><b>{categoria.nombre}</b>{form.categoria === categoria.id && <i>✓</i>}</button>; })}</section>
+                  <section role="listbox" aria-label={tr("Categorías de gasto", "Expense categories")}>{categorias.map((categoria) => { const Icono = iconos[categoria.id] || CreditCard; return <button type="button" role="option" aria-selected={form.categoria === categoria.id} className={form.categoria === categoria.id ? "seleccionada" : ""} key={categoria.id} onClick={() => seleccionarCategoria(categoria.id)}><span style={{ color: categoria.color, background: `${categoria.color}18` }}><Icono size={18} /></span><b>{categoria.nombre}</b>{form.categoria === categoria.id && <i>✓</i>}</button>; })}</section>
                 </div>}
               </label>
             </div>

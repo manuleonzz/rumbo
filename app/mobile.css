@@ -75,7 +75,7 @@ button, input, select { max-width:100%; }
   }
   .demo-category-menu {
     position:fixed;z-index:110;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));
-    top:auto;bottom:max(12px,env(safe-area-inset-bottom));width:auto;max-height:min(520px,65dvh);overflow:auto;
+    top:auto;bottom:max(12px,env(safe-area-inset-bottom));width:auto;max-height:min(520px,65dvh);overflow:hidden;
   }
 
   /* Onboarding */

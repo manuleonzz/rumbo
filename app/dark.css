@@ -191,6 +191,10 @@ html[data-theme="dark"] .budget-period-switch button { color: #aebed0; }
 html[data-theme="dark"] .budget-period-switch button.activo { background: #5771e5; color: #fff; }
 html[data-theme="dark"] .movement-filter-bar button:hover,
 html[data-theme="dark"] .movement-filter-bar button.activo { border-color: #7188f4; background: #233250; color: #b9c5ff; }
+html[data-theme="dark"] .demo-category-menu > section { scrollbar-color:#66778b #1a2838; }
+html[data-theme="dark"] .demo-category-menu > section::-webkit-scrollbar-track { background:#1a2838; }
+html[data-theme="dark"] .demo-category-menu > section::-webkit-scrollbar-thumb { border-color:#1a2838;background:#66778b; }
+html[data-theme="dark"] .demo-category-menu > section::-webkit-scrollbar-thumb:hover { background:#8b9bae; }
 
 /* Dashboard: notices, summaries and chart internals */
 html[data-theme="dark"] .demo-form-error,
