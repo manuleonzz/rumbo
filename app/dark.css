@@ -230,6 +230,21 @@ html[data-theme="dark"] .demo-health-card>p { color:#a8b8c9; }
 html[data-theme="dark"] .demo-category-info span { color:#aebccd; }
 html[data-theme="dark"] .demo-category-info span small,
 html[data-theme="dark"] .demo-category>strong { color:#8fa1b5; }
+html[data-theme="dark"] .planned-payment {
+  border-color:var(--dark-border);
+  background:var(--dark-panel-soft);
+}
+html[data-theme="dark"] .planned-payment:hover { border-color:#52658a;background:#1d2d43; }
+html[data-theme="dark"] .planned-payment.pagado { border-color:#2f6e5d;background:#17332d; }
+html[data-theme="dark"] .planned-payment-copy>b,
+html[data-theme="dark"] .planned-payment>strong { color:var(--dark-text); }
+html[data-theme="dark"] .planned-payment-copy>small { color:#91a2b5; }
+html[data-theme="dark"] .planned-payment.pagado .planned-payment-copy>small { color:#7be0c1; }
+html[data-theme="dark"] .planned-payment-check { border-color:var(--dark-border);background:var(--dark-field);color:#94a5b8; }
+html[data-theme="dark"] .planned-payment-check.activo { border-color:#35bd98;background:#238c70;color:#fff; }
+html[data-theme="dark"] .planned-payments-empty { border-color:var(--dark-border);color:#93a4b7; }
+html[data-theme="dark"] .planned-payments-empty b { color:var(--dark-text); }
+html[data-theme="dark"] .planned-payment-modal input:disabled { border-color:var(--dark-border);background:#1c2a3a;color:#91a2b5; }
 
 /* Dashboard: modal close buttons and disabled actions */
 html[data-theme="dark"] .income-close,

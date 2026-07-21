@@ -10,6 +10,7 @@ Este proyecto nació como muestra de que **cualquier persona puede construir una
 - **Ingresos flexibles**: permite ajustar cada cobro y registrar bonos o ingresos extraordinarios.
 - **Gastos y movimientos visuales**: categorías por color, buscador, iconos y gráfico circular interactivo.
 - **Historial mensual automático**: cada movimiento conserva su fecha real; al cambiar de mes el resumen empieza en cero sin borrar los meses anteriores.
+- **Pagos previstos rápidos**: registra suscripciones y recibos desde el resumen, confirma importes variables, evita duplicados y permite deshacer cada pago.
 - **Presupuestos por categorías**: reparte el dinero con sobres visuales y ajusta límites en tiempo real.
 - **Metas de ahorro**: objetivos a corto, medio y largo plazo, además de ahorro sin fecha.
 - **Control de deudas**: calcula cuotas restantes y una fecha estimada de finalización.

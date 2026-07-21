@@ -6,6 +6,7 @@ import IncomeManager from "./IncomeManager";
 import AppControls from "./AppControls";
 import SettingsPage from "./SettingsPage";
 import { crearCobrosDelPeriodo, desplazarPeriodo, etiquetaPeriodo, fechaEnPeriodo, fechaLocalISO, formatearFecha, normalizarFechaMovimiento, periodoActual, periodoDeFecha } from "../src/lib/monthly";
+import { buscarMovimientoDePago, crearPagosPrevistos, normalizarPagosPrevistos } from "../src/lib/recurring";
 import {
   ArrowDownRight,
   ArrowLeft,
@@ -14,6 +15,8 @@ import {
   Bell,
   CalendarDays,
   Car,
+  Check,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -30,12 +33,14 @@ import {
   MoreHorizontal,
   Plus,
   Rocket,
+  RotateCcw,
   Search,
   Settings,
   ShieldCheck,
   ShoppingBasket,
   SlidersHorizontal,
   Sparkles,
+  ReceiptText,
   Target,
   TrendingUp,
   Trophy,
@@ -187,6 +192,10 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
   const [ingresosAbiertos, setIngresosAbiertos] = useState(false);
   const [categorias, setCategorias] = useState(() => (Array.isArray(snapshot.categorias) && snapshot.categorias.length ? snapshot.categorias : categoriasIniciales).map((categoria) => ({ ...categoria, usado: 0 })));
   const [movimientos, setMovimientos] = useState(() => (Array.isArray(snapshot.movimientos) ? snapshot.movimientos : esCuentaReal ? [] : movimientosIniciales).map((movimiento) => ({ ...movimiento, fechaISO: normalizarFechaMovimiento(movimiento) })));
+  const [servicios, setServicios] = useState(() => Array.isArray(snapshot.servicios) ? snapshot.servicios : []);
+  const [pagosPrevistos, setPagosPrevistos] = useState(() => normalizarPagosPrevistos(snapshot.pagosPrevistos, snapshot.categorias || categoriasIniciales, snapshot.servicios || []));
+  const [pagoModal, setPagoModal] = useState(null);
+  const [mostrarTodosPagos, setMostrarTodosPagos] = useState(false);
   const [metas, setMetas] = useState(Array.isArray(snapshot.metas) ? snapshot.metas : []);
   const [metaModal, setMetaModal] = useState(false);
   const [deudas, setDeudas] = useState(Array.isArray(snapshot.deudas) ? snapshot.deudas : []);
@@ -230,6 +239,14 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
   const metaDestacada = metas.find((meta) => Number(meta.objetivo || 0) > 0);
   const importeFormulario = Number(String(form.importe).replace(",", "."));
   const importeValido = Number.isFinite(importeFormulario) && importeFormulario > 0;
+  const pagosConEstado = useMemo(() => pagosPrevistos.map((pago) => ({
+    ...pago,
+    movimiento: buscarMovimientoDePago(pago, movimientos, periodoActivo),
+  })), [pagosPrevistos, movimientos, periodoActivo]);
+  const pagosPendientes = pagosConEstado.filter((pago) => !pago.movimiento);
+  const totalPendiente = pagosPendientes.reduce((total, pago) => total + Number(pago.importe || 0), 0);
+  const pagosVisibles = mostrarTodosPagos ? pagosConEstado : pagosConEstado.slice(0, 6);
+  const periodoFuturo = periodoActivo > periodoActual();
 
   const abrirNuevoGasto = () => {
     const hoy = fechaLocalISO();
@@ -244,8 +261,17 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
 
   useEffect(() => {
     if (!cloudData || configurando) return;
-    cloudData.setKey("rumbo_v2", { versionDatos: 3, configurado: true, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias: categorias.map((categoria) => ({ ...categoria, usado: 0 })), movimientos, metas, deudas });
-  }, [configurando, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias, movimientos, metas, deudas]);
+    cloudData.setKey("rumbo_v2", { versionDatos: 4, configurado: true, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias: categorias.map((categoria) => ({ ...categoria, usado: 0 })), movimientos, servicios, pagosPrevistos, metas, deudas });
+  }, [configurando, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias, movimientos, servicios, pagosPrevistos, metas, deudas]);
+
+  useEffect(() => {
+    const generados = crearPagosPrevistos(categorias, servicios);
+    setPagosPrevistos((actuales) => {
+      const porId = new Map(actuales.map((pago) => [pago.id, pago]));
+      const siguientes = generados.map((generado) => ({ ...generado, ...(porId.get(generado.id) || {}), importe: generado.importe, nombre: generado.nombre, categoria: generado.categoria, color: generado.color }));
+      return JSON.stringify(siguientes) === JSON.stringify(actuales) ? actuales : siguientes;
+    });
+  }, [categorias, servicios]);
 
   useEffect(() => {
     const comprobarCambioDeMes = () => {
@@ -296,7 +322,46 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
     window.setTimeout(() => setAviso(""), 3200);
   };
 
-  const completarConfiguracion = async ({ frecuencia, ingresoPorPago, categorias: nuevasCategorias, metas: nuevasMetas = [], deudas: nuevasDeudas = [] }) => {
+  const fechaParaPagoPrevisto = () => periodoActivo === periodoActual()
+    ? fechaLocalISO()
+    : fechaEnPeriodo(periodoActivo, Math.min(new Date().getDate(), 28));
+
+  const registrarPagoPrevisto = (pago, importe = pago.importe, fecha = fechaParaPagoPrevisto()) => {
+    if (periodoFuturo) return;
+    const movimientoExistente = buscarMovimientoDePago(pago, movimientos, periodoActivo);
+    if (movimientoExistente) return;
+    const importeNumerico = Number(String(importe).replace(",", "."));
+    if (!Number.isFinite(importeNumerico) || importeNumerico <= 0) return;
+    setMovimientos((actuales) => [{
+      id: Date.now(),
+      recurrenteId: pago.id,
+      nombre: pago.nombre,
+      categoria: pago.categoria,
+      fechaISO: fecha,
+      importe: importeNumerico,
+    }, ...actuales]);
+    setPagoModal(null);
+    setAviso(tr(`${pago.nombre} registrado por ${euros.format(importeNumerico)}`, `${pago.nombre} recorded for ${euros.format(importeNumerico)}`));
+    window.setTimeout(() => setAviso(""), 3200);
+  };
+
+  const alternarPagoPrevisto = (pago) => {
+    const movimiento = buscarMovimientoDePago(pago, movimientos, periodoActivo);
+    if (movimiento) {
+      setMovimientos((actuales) => actuales.filter((item) => item.id !== movimiento.id));
+      setAviso(tr(`Se deshizo el pago de ${pago.nombre}`, `${pago.nombre} payment was undone`));
+      window.setTimeout(() => setAviso(""), 3200);
+      return;
+    }
+    if (periodoFuturo) return;
+    if (pago.fijo) {
+      registrarPagoPrevisto(pago);
+      return;
+    }
+    setPagoModal({ pago, importe: String(pago.importe), fecha: fechaParaPagoPrevisto(), error: "" });
+  };
+
+  const completarConfiguracion = async ({ frecuencia, ingresoPorPago, categorias: nuevasCategorias, servicios: nuevosServicios = [], metas: nuevasMetas = [], deudas: nuevasDeudas = [] }) => {
     setFrecuenciaCobro(frecuencia);
     setIngresoPorPago(Number(ingresoPorPago || 0));
     const nuevosCobros = crearCobrosDelPeriodo(frecuencia, ingresoPorPago, periodoActivo, !esCuentaReal);
@@ -306,20 +371,25 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
       usado: esCuentaReal ? 0 : Math.round(categoria.limite * [0.62, 0.48, 0.55, 0.41, 0.36, 0.28, 0.72][index % 7] * 100) / 100,
     }));
     const movimientosConfigurados = esCuentaReal ? [] : movimientos;
+    const pagosConfigurados = crearPagosPrevistos(categoriasConfiguradas, nuevosServicios);
     setCobrosPorMes(nuevosCobrosPorMes);
     setCategorias(categoriasConfiguradas);
     setMovimientos(movimientosConfigurados);
+    setServicios(nuevosServicios);
+    setPagosPrevistos(pagosConfigurados);
     setMetas(nuevasMetas);
     setDeudas(nuevasDeudas);
     if (cloudData) {
       await cloudData.setKey("rumbo_v2", {
-        versionDatos: 3,
+        versionDatos: 4,
         configurado: true,
         frecuenciaCobro: frecuencia,
         ingresoPorPago: Number(ingresoPorPago || 0),
         cobrosPorMes: nuevosCobrosPorMes,
         categorias: categoriasConfiguradas,
         movimientos: movimientosConfigurados,
+        servicios: nuevosServicios,
+        pagosPrevistos: pagosConfigurados,
         metas: nuevasMetas,
         deudas: nuevasDeudas,
       }, { immediate: true });
@@ -421,6 +491,41 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
           </section>
 
           <section className="demo-lower-grid">
+            <article className="demo-panel demo-planned-payments">
+              <div className="demo-panel-head planned-payments-head">
+                <div>
+                  <h2>{tr("Pagos previstos", "Planned payments")}</h2>
+                  <p>{periodoFuturo
+                    ? tr(`Se activarán cuando comience ${etiquetaMes}`, `They will become available when ${etiquetaMes} begins`)
+                    : pagosPendientes.length
+                      ? tr(`${pagosPendientes.length} pendientes · ${euros.format(totalPendiente)}`, `${pagosPendientes.length} pending · ${euros.format(totalPendiente)}`)
+                      : tr(`Todo pagado en ${etiquetaMes}`, `Everything paid in ${etiquetaMes}`)}</p>
+                </div>
+                {pagosConEstado.length > 6 && <button onClick={() => setMostrarTodosPagos((actual) => !actual)}>{mostrarTodosPagos ? tr("Ver menos", "Show less") : tr("Ver todos", "View all")} <ArrowRightIcon /></button>}
+              </div>
+              {pagosVisibles.length ? <div className="planned-payments-grid">
+                {pagosVisibles.map((pago) => {
+                  const Icono = pago.tipo === "suscripcion" ? CreditCard : (iconos[pago.categoria] || ReceiptText);
+                  const pagado = Boolean(pago.movimiento);
+                  return <div className={pagado ? "planned-payment pagado" : "planned-payment"} key={pago.id}>
+                    <span className="planned-payment-icon" style={{ color: pago.color, background: `${pago.color || "#5771e5"}18` }}><Icono size={18} /></span>
+                    <div className="planned-payment-copy"><b>{pago.nombre}</b><small>{pagado
+                      ? tr(`Pagado el ${formatearFecha(pago.movimiento.fechaISO, settings.language, { corta: true })}`, `Paid ${formatearFecha(pago.movimiento.fechaISO, settings.language, { corta: true })}`)
+                      : pago.fijo ? tr("Importe fijo", "Fixed amount") : tr("Confirma el importe", "Confirm amount")}</small></div>
+                    <strong>{euros.format(pagado ? pago.movimiento.importe : pago.importe)}</strong>
+                    <button
+                      type="button"
+                      className={pagado ? "planned-payment-check activo" : "planned-payment-check"}
+                      disabled={periodoFuturo && !pagado}
+                      onClick={() => alternarPagoPrevisto(pago)}
+                      aria-label={pagado ? tr(`Deshacer pago de ${pago.nombre}`, `Undo ${pago.nombre} payment`) : tr(`Registrar pago de ${pago.nombre}`, `Record ${pago.nombre} payment`)}
+                      title={pagado ? tr("Deshacer", "Undo") : periodoFuturo ? tr("Disponible al comenzar el mes", "Available when the month begins") : tr("Registrar como pagado", "Mark as paid")}
+                    ><Check className="payment-check-icon" size={16} /><RotateCcw className="payment-undo-icon" size={14} /></button>
+                  </div>;
+                })}
+              </div> : <div className="planned-payments-empty"><CheckCircle2 size={22} /><div><b>{tr("No hay pagos previstos", "No planned payments")}</b><span>{tr("Añade presupuestos o suscripciones para verlos aquí.", "Add budgets or subscriptions to see them here.")}</span></div></div>}
+            </article>
+
             <article className="demo-panel demo-budget-panel">
               <div className="demo-panel-head"><div><h2>{tr("Presupuesto por categoría", "Budget by category")}</h2><p>{tr("Tu progreso durante", "Your progress during")} {etiquetaMes}</p></div><button onClick={() => setVista("movimientos")}>{tr("Ver todos", "View all")} <ArrowRightIcon /></button></div>
               <div className="demo-categories">
@@ -480,10 +585,39 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
           </form>
         </div>
       )}
+      {pagoModal && (
+        <div className="demo-modal-backdrop" onMouseDown={() => setPagoModal(null)}>
+          <form className="demo-modal planned-payment-modal" onSubmit={(e) => {
+            e.preventDefault();
+            const importe = Number(String(pagoModal.importe).replace(",", "."));
+            if (!Number.isFinite(importe) || importe <= 0) {
+              setPagoModal({ ...pagoModal, error: tr("Introduce un importe mayor que 0 €.", "Enter an amount greater than €0.") });
+              return;
+            }
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(pagoModal.fecha || "") || pagoModal.fecha > fechaLocalISO() || periodoDeFecha(pagoModal.fecha) !== periodoActivo) {
+              setPagoModal({ ...pagoModal, error: tr(`Selecciona una fecha válida de ${etiquetaMes}.`, `Select a valid date in ${etiquetaMes}.`) });
+              return;
+            }
+            registrarPagoPrevisto(pagoModal.pago, importe, pagoModal.fecha);
+          }} onMouseDown={(e) => e.stopPropagation()}>
+            <button type="button" className="demo-modal-close" onClick={() => setPagoModal(null)}><X size={18} /></button>
+            <span className="demo-modal-icon planned"><ReceiptText size={22} /></span>
+            <h2>{tr("Confirmar pago previsto", "Confirm planned payment")}</h2>
+            <p>{tr("Comprueba el importe real antes de crear el movimiento.", "Check the actual amount before creating the transaction.")}</p>
+            <label>{tr("Descripción", "Description")}<input value={pagoModal.pago.nombre} disabled /></label>
+            <div className="demo-form-row">
+              <label>{tr("Importe real", "Actual amount")}<input autoFocus type="text" inputMode="decimal" value={pagoModal.importe} onChange={(e) => { const valor = e.target.value; if (/^\d*[.,]?\d{0,2}$/.test(valor)) setPagoModal({ ...pagoModal, importe: valor, error: "" }); }} /></label>
+              <label className="demo-date-field">{tr("Fecha del pago", "Payment date")}<div><CalendarDays size={17} /><input type="date" max={fechaLocalISO()} value={pagoModal.fecha} onChange={(e) => setPagoModal({ ...pagoModal, fecha: e.target.value, error: "" })} /></div></label>
+            </div>
+            {pagoModal.error && <div className="demo-form-error"><CircleHelp size={15} /> {pagoModal.error}</div>}
+            <button className="demo-modal-submit" type="submit">{tr("Registrar pago", "Record payment")}</button>
+          </form>
+        </div>
+      )}
       {ingresosAbiertos && <IncomeManager cobros={cobros} setCobros={setCobros} frecuencia={frecuenciaCobro} periodo={periodoActivo} language={settings.language} onClose={() => setIngresosAbiertos(false)} />}
       {metaModal && <GoalModal onClose={() => setMetaModal(false)} onSave={(meta) => { setMetas((actuales) => [...actuales, meta]); setMetaModal(false); }} />}
       {deudaModal && <DebtModal onClose={() => setDeudaModal(false)} onSave={(deuda) => { setDeudas((actuales) => [...actuales, deuda]); setDeudaModal(false); }} />}
-      {aviso && <div className="demo-toast"><span>✓</span><div><b>Movimiento guardado</b><small>{aviso}</small></div></div>}
+      {aviso && <div className="demo-toast"><span>✓</span><div><b>{tr("Rumbo actualizado", "Rumbo updated")}</b><small>{aviso}</small></div></div>}
     </div>
   );
 }
