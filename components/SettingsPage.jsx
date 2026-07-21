@@ -24,12 +24,14 @@ import {
   Save,
   ShieldCheck,
   ShoppingBasket,
+  Smartphone,
   Sparkles,
   Tags,
   Trash2,
   UserRound,
   Utensils,
   WalletCards,
+  Wifi,
 } from "lucide-react";
 
 const MONEDIN_IMG = `${import.meta.env.BASE_URL}monedin.png`;
@@ -42,6 +44,8 @@ const iconos = {
   entretenimiento: Film,
   suscripciones: CreditCard,
   electricidad: Sparkles,
+  suministros: Wifi,
+  telefonia: Smartphone,
   ropa: ShoppingBasket,
 };
 

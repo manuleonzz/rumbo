@@ -39,19 +39,22 @@ import {
   ShieldCheck,
   ShoppingBasket,
   SlidersHorizontal,
+  Smartphone,
   Sparkles,
   ReceiptText,
   Target,
+  Trash2,
   TrendingUp,
   Trophy,
   Utensils,
   WalletCards,
+  Wifi,
   X,
 } from "lucide-react";
 
 const MONEDIN_IMG = `${import.meta.env.BASE_URL}monedin.png`;
 
-const iconos = { hogar: Home, electricidad: Sparkles, comida: ShoppingBasket, transporte: Car, ocio: Coffee, restaurantes: Utensils, ropa: ShoppingBasket, entretenimiento: Film, suscripciones: CreditCard, deudas: WalletCards };
+const iconos = { hogar: Home, electricidad: Wifi, suministros: Wifi, telefonia: Smartphone, comida: ShoppingBasket, transporte: Car, ocio: Coffee, restaurantes: Utensils, ropa: ShoppingBasket, entretenimiento: Film, suscripciones: CreditCard, deudas: WalletCards };
 
 const categoriasIniciales = [
   { id: "hogar", nombre: "Hogar", usado: 617, limite: 700, color: "#5771e5" },
@@ -83,6 +86,7 @@ function esMovimientoDeEjemplo(movimiento) {
 function limpiarDatosReales(snapshot) {
   if (!snapshot || typeof snapshot !== "object") return {};
   const limpio = { ...snapshot };
+  const versionDatos = Number(limpio.versionDatos || 0);
   const movimientosGuardados = Array.isArray(limpio.movimientos) ? limpio.movimientos : [];
   const conteniaEjemplos = movimientosGuardados.some(esMovimientoDeEjemplo);
 
@@ -114,6 +118,15 @@ function limpiarDatosReales(snapshot) {
     Array.isArray(limpio.categorias) && limpio.categorias.length > 0 &&
     (Array.isArray(limpio.cobros) || Boolean(limpio.cobrosPorMes) || Boolean(limpio.frecuenciaCobro));
   if (tieneConfiguracionAnterior) limpio.configurado = true;
+  if (versionDatos < 5 && Array.isArray(limpio.categorias)) {
+    limpio.categorias = limpio.categorias.map((categoria) => categoria.id === "electricidad"
+      ? { ...categoria, nombre: "Suministros del hogar" }
+      : categoria);
+    if (!limpio.categorias.some((categoria) => categoria.id === "telefonia")) {
+      limpio.categorias.push({ id: "telefonia", nombre: "Telefonía", usado: 0, limite: 0, color: "#359cc4" });
+    }
+    limpio.versionDatos = 5;
+  }
   return limpio;
 }
 
@@ -196,6 +209,9 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
   const [pagosPrevistos, setPagosPrevistos] = useState(() => normalizarPagosPrevistos(snapshot.pagosPrevistos, snapshot.categorias || categoriasIniciales, snapshot.servicios || []));
   const [pagoModal, setPagoModal] = useState(null);
   const [mostrarTodosPagos, setMostrarTodosPagos] = useState(false);
+  const [suscripcionesModal, setSuscripcionesModal] = useState(false);
+  const [suscripcionesBorrador, setSuscripcionesBorrador] = useState([]);
+  const [suscripcionNueva, setSuscripcionNueva] = useState({ nombre: "", precio: "", diaCobro: "1" });
   const [metas, setMetas] = useState(Array.isArray(snapshot.metas) ? snapshot.metas : []);
   const [metaModal, setMetaModal] = useState(false);
   const [deudas, setDeudas] = useState(Array.isArray(snapshot.deudas) ? snapshot.deudas : []);
@@ -243,7 +259,8 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
     ...pago,
     movimiento: buscarMovimientoDePago(pago, movimientos, periodoActivo),
   })), [pagosPrevistos, movimientos, periodoActivo]);
-  const pagosPendientes = pagosConEstado.filter((pago) => !pago.movimiento);
+  const pagosPendientes = pagosConEstado.filter((pago) => !pago.movimiento && !pago.requiereDesglose);
+  const pagosSinDesglosar = pagosConEstado.filter((pago) => pago.requiereDesglose);
   const totalPendiente = pagosPendientes.reduce((total, pago) => total + Number(pago.importe || 0), 0);
   const pagosVisibles = mostrarTodosPagos ? pagosConEstado : pagosConEstado.slice(0, 6);
   const periodoFuturo = periodoActivo > periodoActual();
@@ -261,14 +278,25 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
 
   useEffect(() => {
     if (!cloudData || configurando) return;
-    cloudData.setKey("rumbo_v2", { versionDatos: 4, configurado: true, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias: categorias.map((categoria) => ({ ...categoria, usado: 0 })), movimientos, servicios, pagosPrevistos, metas, deudas });
+    cloudData.setKey("rumbo_v2", { versionDatos: 5, configurado: true, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias: categorias.map((categoria) => ({ ...categoria, usado: 0 })), movimientos, servicios, pagosPrevistos, metas, deudas });
   }, [configurando, frecuenciaCobro, ingresoPorPago, cobrosPorMes, categorias, movimientos, servicios, pagosPrevistos, metas, deudas]);
 
   useEffect(() => {
     const generados = crearPagosPrevistos(categorias, servicios);
     setPagosPrevistos((actuales) => {
       const porId = new Map(actuales.map((pago) => [pago.id, pago]));
-      const siguientes = generados.map((generado) => ({ ...generado, ...(porId.get(generado.id) || {}), importe: generado.importe, nombre: generado.nombre, categoria: generado.categoria, color: generado.color }));
+      const siguientes = generados.map((generado) => ({
+        ...generado,
+        ...(porId.get(generado.id) || {}),
+        importe: generado.importe,
+        nombre: generado.nombre,
+        categoria: generado.categoria,
+        color: generado.color,
+        tipo: generado.tipo,
+        fijo: generado.fijo,
+        diaCobro: generado.diaCobro,
+        requiereDesglose: generado.requiereDesglose,
+      }));
       return JSON.stringify(siguientes) === JSON.stringify(actuales) ? actuales : siguientes;
     });
   }, [categorias, servicios]);
@@ -346,6 +374,10 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
   };
 
   const alternarPagoPrevisto = (pago) => {
+    if (pago.requiereDesglose) {
+      abrirGestorSuscripciones();
+      return;
+    }
     const movimiento = buscarMovimientoDePago(pago, movimientos, periodoActivo);
     if (movimiento) {
       setMovimientos((actuales) => actuales.filter((item) => item.id !== movimiento.id));
@@ -359,6 +391,60 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
       return;
     }
     setPagoModal({ pago, importe: String(pago.importe), fecha: fechaParaPagoPrevisto(), error: "" });
+  };
+
+  const abrirGestorSuscripciones = () => {
+    setSuscripcionesBorrador(servicios
+      .filter((servicio) => servicio?.activo !== false)
+      .map((servicio) => ({
+        ...servicio,
+        precio: String(servicio.precio ?? ""),
+        diaCobro: String(servicio.diaCobro || 1),
+      })));
+    setSuscripcionNueva({ nombre: "", precio: "", diaCobro: "1" });
+    setSuscripcionesModal(true);
+  };
+
+  const agregarSuscripcionBorrador = () => {
+    const precio = Number(String(suscripcionNueva.precio).replace(",", "."));
+    const diaCobro = Number(suscripcionNueva.diaCobro);
+    if (!suscripcionNueva.nombre.trim() || !Number.isFinite(precio) || precio <= 0 || diaCobro < 1 || diaCobro > 31) return;
+    setSuscripcionesBorrador((actuales) => [...actuales, {
+      id: `custom-${Date.now()}`,
+      nombre: suscripcionNueva.nombre.trim(),
+      precio: String(precio),
+      diaCobro: String(diaCobro),
+      tipo: "personalizada",
+      sigla: suscripcionNueva.nombre.trim().slice(0, 2).toUpperCase(),
+      color: "#ef7d4f",
+      activo: true,
+    }]);
+    setSuscripcionNueva({ nombre: "", precio: "", diaCobro: "1" });
+  };
+
+  const actualizarSuscripcionBorrador = (id, campo, valor) => {
+    setSuscripcionesBorrador((actuales) => actuales.map((servicio) => servicio.id === id ? { ...servicio, [campo]: valor } : servicio));
+  };
+
+  const guardarSuscripciones = () => {
+    const limpias = suscripcionesBorrador.map((servicio) => ({
+      ...servicio,
+      nombre: String(servicio.nombre || "").trim(),
+      precio: Number(String(servicio.precio).replace(",", ".")),
+      diaCobro: Number(servicio.diaCobro),
+      activo: true,
+    })).filter((servicio) => servicio.nombre && Number.isFinite(servicio.precio) && servicio.precio > 0 && servicio.diaCobro >= 1 && servicio.diaCobro <= 31);
+    if (!limpias.length) return;
+    const total = Number(limpias.reduce((suma, servicio) => suma + servicio.precio, 0).toFixed(2));
+    setServicios(limpias);
+    setCategorias((actuales) => {
+      const existe = actuales.some((categoria) => categoria.id === "suscripciones");
+      if (existe) return actuales.map((categoria) => categoria.id === "suscripciones" ? { ...categoria, nombre: "Suscripciones", limite: total, color: categoria.color || "#ef7d4f" } : categoria);
+      return [...actuales, { id: "suscripciones", nombre: "Suscripciones", limite: total, usado: 0, color: "#ef7d4f" }];
+    });
+    setSuscripcionesModal(false);
+    setAviso(tr(`${limpias.length} suscripciones guardadas por separado`, `${limpias.length} subscriptions saved separately`));
+    window.setTimeout(() => setAviso(""), 3200);
   };
 
   const completarConfiguracion = async ({ frecuencia, ingresoPorPago, categorias: nuevasCategorias, servicios: nuevosServicios = [], metas: nuevasMetas = [], deudas: nuevasDeudas = [] }) => {
@@ -381,7 +467,7 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
     setDeudas(nuevasDeudas);
     if (cloudData) {
       await cloudData.setKey("rumbo_v2", {
-        versionDatos: 4,
+        versionDatos: 5,
         configurado: true,
         frecuenciaCobro: frecuencia,
         ingresoPorPago: Number(ingresoPorPago || 0),
@@ -497,11 +583,16 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
                   <h2>{tr("Pagos previstos", "Planned payments")}</h2>
                   <p>{periodoFuturo
                     ? tr(`Se activarán cuando comience ${etiquetaMes}`, `They will become available when ${etiquetaMes} begins`)
+                    : pagosSinDesglosar.length
+                      ? tr("Separa el total en cada suscripción", "Split the total into individual subscriptions")
                     : pagosPendientes.length
                       ? tr(`${pagosPendientes.length} pendientes · ${euros.format(totalPendiente)}`, `${pagosPendientes.length} pending · ${euros.format(totalPendiente)}`)
                       : tr(`Todo pagado en ${etiquetaMes}`, `Everything paid in ${etiquetaMes}`)}</p>
                 </div>
-                {pagosConEstado.length > 6 && <button onClick={() => setMostrarTodosPagos((actual) => !actual)}>{mostrarTodosPagos ? tr("Ver menos", "Show less") : tr("Ver todos", "View all")} <ArrowRightIcon /></button>}
+                <div className="planned-payments-actions">
+                  <button onClick={abrirGestorSuscripciones}><Plus size={14} /> {tr("Suscripciones", "Subscriptions")}</button>
+                  {pagosConEstado.length > 6 && <button onClick={() => setMostrarTodosPagos((actual) => !actual)}>{mostrarTodosPagos ? tr("Ver menos", "Show less") : tr("Ver todos", "View all")} <ArrowRightIcon /></button>}
+                </div>
               </div>
               {pagosVisibles.length ? <div className="planned-payments-grid">
                 {pagosVisibles.map((pago) => {
@@ -511,16 +602,24 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
                     <span className="planned-payment-icon" style={{ color: pago.color, background: `${pago.color || "#5771e5"}18` }}><Icono size={18} /></span>
                     <div className="planned-payment-copy"><b>{pago.nombre}</b><small>{pagado
                       ? tr(`Pagado el ${formatearFecha(pago.movimiento.fechaISO, settings.language, { corta: true })}`, `Paid ${formatearFecha(pago.movimiento.fechaISO, settings.language, { corta: true })}`)
-                      : pago.fijo ? tr("Importe fijo", "Fixed amount") : tr("Confirma el importe", "Confirm amount")}</small></div>
+                      : pago.requiereDesglose
+                        ? tr("Toca “Separar” para indicar cada servicio", "Tap “Split” to add each service")
+                        : pago.tipo === "suscripcion" && pago.diaCobro
+                          ? tr(`Cobro mensual · día ${pago.diaCobro}`, `Monthly charge · day ${pago.diaCobro}`)
+                          : tr("Confirma el importe", "Confirm amount")}</small></div>
                     <strong>{euros.format(pagado ? pago.movimiento.importe : pago.importe)}</strong>
-                    <button
+                    {pago.requiereDesglose ? <button
+                      type="button"
+                      className="planned-payment-configure"
+                      onClick={abrirGestorSuscripciones}
+                    >{tr("Separar", "Split")}</button> : <button
                       type="button"
                       className={pagado ? "planned-payment-check activo" : "planned-payment-check"}
                       disabled={periodoFuturo && !pagado}
                       onClick={() => alternarPagoPrevisto(pago)}
                       aria-label={pagado ? tr(`Deshacer pago de ${pago.nombre}`, `Undo ${pago.nombre} payment`) : tr(`Registrar pago de ${pago.nombre}`, `Record ${pago.nombre} payment`)}
                       title={pagado ? tr("Deshacer", "Undo") : periodoFuturo ? tr("Disponible al comenzar el mes", "Available when the month begins") : tr("Registrar como pagado", "Mark as paid")}
-                    ><Check className="payment-check-icon" size={16} /><RotateCcw className="payment-undo-icon" size={14} /></button>
+                    ><Check className="payment-check-icon" size={16} /><RotateCcw className="payment-undo-icon" size={14} /></button>}
                   </div>;
                 })}
               </div> : <div className="planned-payments-empty"><CheckCircle2 size={22} /><div><b>{tr("No hay pagos previstos", "No planned payments")}</b><span>{tr("Añade presupuestos o suscripciones para verlos aquí.", "Add budgets or subscriptions to see them here.")}</span></div></div>}
@@ -612,6 +711,39 @@ export default function DemoDashboard({ onExit, settings, cloudData = null, user
             {pagoModal.error && <div className="demo-form-error"><CircleHelp size={15} /> {pagoModal.error}</div>}
             <button className="demo-modal-submit" type="submit">{tr("Registrar pago", "Record payment")}</button>
           </form>
+        </div>
+      )}
+      {suscripcionesModal && (
+        <div className="demo-modal-backdrop" onMouseDown={() => setSuscripcionesModal(false)}>
+          <section className="demo-modal subscriptions-manager" onMouseDown={(e) => e.stopPropagation()}>
+            <button type="button" className="demo-modal-close" onClick={() => setSuscripcionesModal(false)}><X size={18} /></button>
+            <span className="demo-modal-icon subscriptions"><CreditCard size={22} /></span>
+            <h2>{tr("Tus suscripciones, una por una", "Your subscriptions, one by one")}</h2>
+            <p>{tr("Añade cada servicio con su importe y día de cobro. Cada uno tendrá su propio check en el resumen.", "Add every service with its amount and billing day. Each one will have its own checkbox in the overview.")}</p>
+            {!servicios.length && <div className="subscriptions-legacy-note"><CircleHelp size={16} /><span>{tr(`Antes solo se guardó el total de ${euros.format(categorias.find((categoria) => categoria.id === "suscripciones")?.limite || 0)}. Desglósalo aquí una única vez.`, `Previously only the ${euros.format(categorias.find((categoria) => categoria.id === "suscripciones")?.limite || 0)} total was saved. Split it here once.`)}</span></div>}
+
+            <div className="subscriptions-manager-list">
+              {suscripcionesBorrador.map((servicio) => <div className="subscriptions-manager-row" key={servicio.id}>
+                <label><span>{tr("Servicio", "Service")}</span><input value={servicio.nombre} onChange={(e) => actualizarSuscripcionBorrador(servicio.id, "nombre", e.target.value)} /></label>
+                <label><span>{tr("Importe", "Amount")}</span><div><b>€</b><input inputMode="decimal" value={servicio.precio} onChange={(e) => { if (/^\d*[.,]?\d{0,2}$/.test(e.target.value)) actualizarSuscripcionBorrador(servicio.id, "precio", e.target.value); }} /></div></label>
+                <label><span>{tr("Día de cobro", "Billing day")}</span><input type="number" min="1" max="31" value={servicio.diaCobro} onChange={(e) => actualizarSuscripcionBorrador(servicio.id, "diaCobro", e.target.value)} /></label>
+                <button type="button" onClick={() => setSuscripcionesBorrador((actuales) => actuales.filter((item) => item.id !== servicio.id))} aria-label={tr(`Eliminar ${servicio.nombre}`, `Remove ${servicio.nombre}`)}><Trash2 size={17} /></button>
+              </div>)}
+              {!suscripcionesBorrador.length && <div className="subscriptions-manager-empty">{tr("Añade tu primera suscripción abajo.", "Add your first subscription below.")}</div>}
+            </div>
+
+            <div className="subscriptions-manager-add">
+              <label><span>{tr("Nombre", "Name")}</span><input placeholder={tr("Ej. YouTube Premium", "E.g. YouTube Premium")} value={suscripcionNueva.nombre} onChange={(e) => setSuscripcionNueva({ ...suscripcionNueva, nombre: e.target.value })} /></label>
+              <label><span>{tr("Importe", "Amount")}</span><div><b>€</b><input inputMode="decimal" placeholder="0,00" value={suscripcionNueva.precio} onChange={(e) => { if (/^\d*[.,]?\d{0,2}$/.test(e.target.value)) setSuscripcionNueva({ ...suscripcionNueva, precio: e.target.value }); }} /></div></label>
+              <label><span>{tr("Día", "Day")}</span><input type="number" min="1" max="31" value={suscripcionNueva.diaCobro} onChange={(e) => setSuscripcionNueva({ ...suscripcionNueva, diaCobro: e.target.value })} /></label>
+              <button type="button" onClick={agregarSuscripcionBorrador} disabled={!suscripcionNueva.nombre.trim() || !Number(String(suscripcionNueva.precio).replace(",", ".")) || Number(suscripcionNueva.diaCobro) < 1 || Number(suscripcionNueva.diaCobro) > 31}><Plus size={15} /> {tr("Añadir", "Add")}</button>
+            </div>
+
+            <footer className="subscriptions-manager-footer">
+              <div><span>{suscripcionesBorrador.length} {tr("suscripciones", "subscriptions")}</span><b>{euros.format(suscripcionesBorrador.reduce((suma, servicio) => suma + (Number(String(servicio.precio).replace(",", ".")) || 0), 0))} / {tr("mes", "month")}</b></div>
+              <button type="button" className="demo-modal-submit" onClick={guardarSuscripciones} disabled={!suscripcionesBorrador.length}>{tr("Guardar por separado", "Save separately")}</button>
+            </footer>
+          </section>
         </div>
       )}
       {ingresosAbiertos && <IncomeManager cobros={cobros} setCobros={setCobros} frecuencia={frecuenciaCobro} periodo={periodoActivo} language={settings.language} onClose={() => setIngresosAbiertos(false)} />}

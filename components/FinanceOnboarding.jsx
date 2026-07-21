@@ -21,9 +21,11 @@ import {
   Shirt,
   ShoppingBasket,
   Sparkles,
+  Smartphone,
   Trash2,
   Utensils,
   WalletCards,
+  Wifi,
   X,
   Zap,
 } from "lucide-react";
@@ -40,7 +42,8 @@ const frecuencias = [
 
 const categoriasBase = [
   { id: "hogar", nombre: "Hogar", ayuda: "Alquiler o hipoteca", importe: 800, color: "#5771e5", icono: Home },
-  { id: "electricidad", nombre: "Electricidad y servicios", ayuda: "Luz, agua, internet", importe: 150, color: "#8b65d9", icono: Zap },
+  { id: "suministros", nombre: "Suministros del hogar", ayuda: "Luz, agua, gas e internet", importe: 150, color: "#8b65d9", icono: Wifi },
+  { id: "telefonia", nombre: "Telefonía", ayuda: "Tarifa móvil y teléfono", importe: 35, color: "#359cc4", icono: Smartphone },
   { id: "transporte", nombre: "Transporte", ayuda: "Coche, gasolina o tren", importe: 300, color: "#eea83d", icono: Car },
   { id: "comida", nombre: "Supermercado", ayuda: "Compra para casa", importe: 400, color: "#26a889", icono: ShoppingBasket },
   { id: "restaurantes", nombre: "Restaurantes", ayuda: "Comer fuera y delivery", importe: 150, color: "#e56d7a", icono: Utensils },
@@ -119,19 +122,19 @@ export default function FinanceOnboarding({ onComplete, onCancel, settings, isDe
   const [frecuencia, setFrecuencia] = useState("semanal");
   const [ingreso, setIngreso] = useState("650");
   const [categorias, setCategorias] = useState(categoriasBase);
-  const [servicios, setServicios] = useState(serviciosBase.map((s) => ({ ...s, activo: ["netflix", "spotify"].includes(s.id) })));
+  const [servicios, setServicios] = useState(serviciosBase.map((s) => ({ ...s, diaCobro: 1, activo: ["netflix", "spotify"].includes(s.id) })));
   const [suscripcionesAbiertas, setSuscripcionesAbiertas] = useState(false);
   const [filtroSuscripcion, setFiltroSuscripcion] = useState("todas");
   const [busquedaSuscripcion, setBusquedaSuscripcion] = useState("");
-  const [personalizada, setPersonalizada] = useState({ nombre: "", precio: "", tipo: "video" });
+  const [personalizada, setPersonalizada] = useState({ nombre: "", precio: "", diaCobro: "1", tipo: "video" });
   const [metas, setMetas] = useState([]);
   const [metaBorrador, setMetaBorrador] = useState({ tipo: "corto", nombre: "", objetivo: "" });
   const [tieneDeudas, setTieneDeudas] = useState(null);
   const [deudas, setDeudas] = useState([]);
   const [deudaBorrador, setDeudaBorrador] = useState({ tipo: "coche", nombre: "", saldo: "", cuota: "", tae: "" });
   const tr = (es, en) => settings.language === "en" ? en : es;
-  const categoryEnglish = { hogar: "Home", electricidad: "Utilities", transporte: "Transport", comida: "Groceries", restaurantes: "Restaurants", ropa: "Clothing & care", entretenimiento: "Entertainment" };
-  const categoryHelpEnglish = { hogar: "Rent or mortgage", electricidad: "Power, water, internet", transporte: "Car, fuel or train", comida: "Household groceries", restaurantes: "Eating out and delivery", ropa: "Clothing, haircuts and more", entretenimiento: "Cinema, games and events" };
+  const categoryEnglish = { hogar: "Home", suministros: "Household utilities", telefonia: "Mobile phone", transporte: "Transport", comida: "Groceries", restaurantes: "Restaurants", ropa: "Clothing & care", entretenimiento: "Entertainment" };
+  const categoryHelpEnglish = { hogar: "Rent or mortgage", suministros: "Power, water, gas and home internet", telefonia: "Mobile plan and phone", transporte: "Car, fuel or train", comida: "Household groceries", restaurantes: "Eating out and delivery", ropa: "Clothing, haircuts and more", entretenimiento: "Cinema, games and events" };
 
   const frecuenciaActiva = frecuencias.find((f) => f.id === frecuencia);
   const ingresoMensual = Math.round((Number(ingreso) || 0) * frecuenciaActiva.factor);
@@ -161,11 +164,12 @@ export default function FinanceOnboarding({ onComplete, onCancel, settings, isDe
   const actualizarCategoria = (id, valor) => setCategorias((actuales) => actuales.map((c) => c.id === id ? { ...c, importe: valor } : c));
   const alternarServicio = (id) => setServicios((actuales) => actuales.map((s) => s.id === id ? { ...s, activo: !s.activo } : s));
   const actualizarPrecioServicio = (id, precio) => setServicios((actuales) => actuales.map((s) => s.id === id ? { ...s, precio: Number(precio) || 0 } : s));
+  const actualizarDiaServicio = (id, diaCobro) => setServicios((actuales) => actuales.map((s) => s.id === id ? { ...s, diaCobro: Math.min(31, Math.max(1, Number(diaCobro) || 1)) } : s));
   const serviciosVisibles = servicios.filter((s) => (filtroSuscripcion === "todas" || s.tipo === filtroSuscripcion) && s.nombre.toLowerCase().includes(busquedaSuscripcion.toLowerCase()));
   const agregarPersonalizada = () => {
     if (!personalizada.nombre.trim() || !Number(personalizada.precio)) return;
-    setServicios((actuales) => [...actuales, { id: `custom-${Date.now()}`, nombre: personalizada.nombre.trim(), precio: Number(personalizada.precio), tipo: personalizada.tipo, sigla: personalizada.nombre.trim().slice(0, 2).toUpperCase(), color: "#64748b", activo: true }]);
-    setPersonalizada({ nombre: "", precio: "", tipo: "video" });
+    setServicios((actuales) => [...actuales, { id: `custom-${Date.now()}`, nombre: personalizada.nombre.trim(), precio: Number(personalizada.precio), diaCobro: Math.min(31, Math.max(1, Number(personalizada.diaCobro) || 1)), tipo: personalizada.tipo, sigla: personalizada.nombre.trim().slice(0, 2).toUpperCase(), color: "#64748b", activo: true }]);
+    setPersonalizada({ nombre: "", precio: "", diaCobro: "1", tipo: "video" });
   };
   const agregarMeta = () => {
     if (!metaBorrador.nombre.trim()) return;
@@ -327,9 +331,9 @@ export default function FinanceOnboarding({ onComplete, onCancel, settings, isDe
           <div className="subscription-filters">{tiposSuscripcion.map((tipo) => <button key={tipo.id} className={filtroSuscripcion === tipo.id ? "activo" : ""} onClick={() => setFiltroSuscripcion(tipo.id)}>{tipo.nombre}</button>)}</div>
           <div className="subscription-catalog">{serviciosVisibles.map((servicio) => <article key={servicio.id} className={servicio.activo ? "activo" : ""}>
             <button className="subscription-select" onClick={() => alternarServicio(servicio.id)}><span style={{ background: servicio.color }}>{servicio.sigla}</span><div><b>{servicio.nombre}</b><small>{tiposSuscripcion.find((t) => t.id === servicio.tipo)?.nombre}</small></div>{servicio.activo ? <i><Check size={13} /></i> : <Plus size={15} />}</button>
-            {servicio.activo && <label><span>€</span><input type="number" min="0" step="0.01" value={servicio.precio} onChange={(e) => actualizarPrecioServicio(servicio.id, e.target.value)} /><small>/mes</small></label>}
+            {servicio.activo && <div className="subscription-details"><label><span>€</span><input type="number" min="0" step="0.01" value={servicio.precio} onChange={(e) => actualizarPrecioServicio(servicio.id, e.target.value)} /><small>/mes</small></label><label><small>Día</small><input type="number" min="1" max="31" value={servicio.diaCobro} onChange={(e) => actualizarDiaServicio(servicio.id, e.target.value)} /></label></div>}
           </article>)}</div>
-          <div className="subscription-custom"><b>¿No aparece en la lista?</b><div><input value={personalizada.nombre} onChange={(e) => setPersonalizada({ ...personalizada, nombre: e.target.value })} placeholder="Nombre de la suscripción" /><select value={personalizada.tipo} onChange={(e) => setPersonalizada({ ...personalizada, tipo: e.target.value })}>{tiposSuscripcion.filter((t) => t.id !== "todas").map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}</select><label><span>€</span><input type="number" min="0" step="0.01" value={personalizada.precio} onChange={(e) => setPersonalizada({ ...personalizada, precio: e.target.value })} placeholder="0,00" /></label><button onClick={agregarPersonalizada}>Añadir</button></div></div>
+          <div className="subscription-custom"><b>¿No aparece en la lista?</b><div><input value={personalizada.nombre} onChange={(e) => setPersonalizada({ ...personalizada, nombre: e.target.value })} placeholder="Nombre de la suscripción" /><select value={personalizada.tipo} onChange={(e) => setPersonalizada({ ...personalizada, tipo: e.target.value })}>{tiposSuscripcion.filter((t) => t.id !== "todas").map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}</select><label><span>€</span><input type="number" min="0" step="0.01" value={personalizada.precio} onChange={(e) => setPersonalizada({ ...personalizada, precio: e.target.value })} placeholder="0,00" /></label><label><small>Día</small><input type="number" min="1" max="31" value={personalizada.diaCobro} onChange={(e) => setPersonalizada({ ...personalizada, diaCobro: e.target.value })} /></label><button onClick={agregarPersonalizada}>Añadir</button></div></div>
           <footer><span>{servicios.filter((s) => s.activo).length} seleccionadas · <b>{totalSuscripciones.toFixed(2).replace(".", ",")} €/mes</b></span><button onClick={() => setSuscripcionesAbiertas(false)}>Listo</button></footer>
         </section>
       </div>}

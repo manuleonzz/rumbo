@@ -64,6 +64,7 @@ html[data-theme="dark"] .setup-debt-fields input,
 html[data-theme="dark"] .setup-debt-fields label > div,
 html[data-theme="dark"] .subscription-search,
 html[data-theme="dark"] .subscription-catalog article > label,
+html[data-theme="dark"] .subscription-details > label,
 html[data-theme="dark"] .subscription-custom input,
 html[data-theme="dark"] .subscription-custom select,
 html[data-theme="dark"] .subscription-custom label {
@@ -75,6 +76,7 @@ html[data-theme="dark"] .setup-money-input input,
 html[data-theme="dark"] .setup-expense-input input,
 html[data-theme="dark"] .subscription-search input,
 html[data-theme="dark"] .subscription-catalog article > label input,
+html[data-theme="dark"] .subscription-details input,
 html[data-theme="dark"] .subscription-select { color: var(--dark-text); }
 
 /* Onboarding: active states */
@@ -245,6 +247,17 @@ html[data-theme="dark"] .planned-payment-check.activo { border-color:#35bd98;bac
 html[data-theme="dark"] .planned-payments-empty { border-color:var(--dark-border);color:#93a4b7; }
 html[data-theme="dark"] .planned-payments-empty b { color:var(--dark-text); }
 html[data-theme="dark"] .planned-payment-modal input:disabled { border-color:var(--dark-border);background:#1c2a3a;color:#91a2b5; }
+html[data-theme="dark"] .planned-payment-configure { border-color:#40557e;background:#203252;color:#9fb0ff; }
+html[data-theme="dark"] .subscriptions-manager-row,
+html[data-theme="dark"] .subscriptions-manager-row input,
+html[data-theme="dark"] .subscriptions-manager-row label>div,
+html[data-theme="dark"] .subscriptions-manager-add input,
+html[data-theme="dark"] .subscriptions-manager-add label>div { border-color:var(--dark-border);background:var(--dark-field);color:var(--dark-text); }
+html[data-theme="dark"] .subscriptions-manager-add { background:#18273b; }
+html[data-theme="dark"] .subscriptions-manager-footer { border-color:var(--dark-border); }
+html[data-theme="dark"] .subscriptions-manager-footer>div>b { color:var(--dark-text); }
+html[data-theme="dark"] .subscriptions-legacy-note { background:#332b18;color:#e6c67a; }
+html[data-theme="dark"] .subscriptions-manager-empty { border-color:var(--dark-border);color:#93a4b7; }
 
 /* Dashboard: modal close buttons and disabled actions */
 html[data-theme="dark"] .income-close,

@@ -11,6 +11,8 @@ Este proyecto nació como muestra de que **cualquier persona puede construir una
 - **Gastos y movimientos visuales**: categorías por color, buscador, iconos y gráfico circular interactivo.
 - **Historial mensual automático**: cada movimiento conserva su fecha real; al cambiar de mes el resumen empieza en cero sin borrar los meses anteriores.
 - **Pagos previstos rápidos**: registra suscripciones y recibos desde el resumen, confirma importes variables, evita duplicados y permite deshacer cada pago.
+- **Suscripciones individuales**: guarda cada servicio con su propio importe, día de cobro y check mensual, incluida la migración desde totales antiguos.
+- **Categorías más claras**: separa alquiler, suministros del hogar (incluido internet) y telefonía móvil.
 - **Presupuestos por categorías**: reparte el dinero con sobres visuales y ajusta límites en tiempo real.
 - **Metas de ahorro**: objetivos a corto, medio y largo plazo, además de ahorro sin fecha.
 - **Control de deudas**: calcula cuotas restantes y una fecha estimada de finalización.

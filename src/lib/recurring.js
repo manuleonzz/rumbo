@@ -1,4 +1,4 @@
-const CATEGORIAS_RECURRENTES = new Set(["hogar", "electricidad", "suscripciones"]);
+const CATEGORIAS_RECURRENTES = new Set(["hogar", "electricidad", "suministros", "telefonia", "suscripciones"]);
 
 function textoId(valor) {
   return String(valor || "")
@@ -12,10 +12,11 @@ function textoId(valor) {
 export function crearPagosPrevistos(categorias = [], servicios = []) {
   const suscripciones = servicios
     .filter((servicio) => servicio?.activo !== false && Number(servicio?.precio) > 0)
-    .map((servicio, index) => ({
-      id: `suscripcion-${textoId(servicio.id || servicio.nombre)}-${index}`,
+    .map((servicio) => ({
+      id: `suscripcion-${textoId(servicio.id || servicio.nombre)}`,
       nombre: servicio.nombre || "Suscripción",
       importe: Number(servicio.precio),
+      diaCobro: Math.min(31, Math.max(1, Number(servicio.diaCobro) || 1)),
       categoria: "suscripciones",
       tipo: "suscripcion",
       fijo: true,
@@ -34,12 +35,17 @@ export function crearPagosPrevistos(categorias = [], servicios = []) {
       importe: Number(categoria.limite),
       categoria: categoria.id,
       tipo: categoria.id === "suscripciones" ? "suscripcion" : "previsto",
-      fijo: categoria.id === "suscripciones",
+      fijo: false,
+      requiereDesglose: categoria.id === "suscripciones" && !tieneSuscripcionesIndividuales,
       activo: true,
       color: categoria.color || "#5771e5",
     }));
 
-  return [...suscripciones, ...previstos];
+  return [...suscripciones, ...previstos].sort((a, b) => {
+    if (a.tipo === "suscripcion" && b.tipo !== "suscripcion") return -1;
+    if (a.tipo !== "suscripcion" && b.tipo === "suscripcion") return 1;
+    return Number(a.diaCobro || 99) - Number(b.diaCobro || 99);
+  });
 }
 
 export function normalizarPagosPrevistos(pagos, categorias = [], servicios = []) {
@@ -53,6 +59,8 @@ export function normalizarPagosPrevistos(pagos, categorias = [], servicios = [])
       categoria: pago.categoria || "hogar",
       tipo: pago.tipo || "previsto",
       fijo: pago.fijo ?? pago.tipo === "suscripcion",
+      diaCobro: pago.diaCobro ? Math.min(31, Math.max(1, Number(pago.diaCobro))) : undefined,
+      requiereDesglose: Boolean(pago.requiereDesglose),
       activo: true,
     }));
 }
