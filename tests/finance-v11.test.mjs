@@ -4,7 +4,7 @@ import { crearGraficaBalance } from "../src/lib/balance.js";
 import { CATEGORIAS_RECOMENDADAS, migrarCategoriasRecomendadas } from "../src/lib/categories.js";
 import { actualizarMovimiento } from "../src/lib/movements.js";
 import { actualizarPagoPrevisto, buscarMovimientoDePago, crearPagosPrevistos, eliminarPagoPrevisto, migrarPagosPrevistos, normalizarPagosPrevistos } from "../src/lib/recurring.js";
-import { recuperarServiciosGuardados } from "../src/lib/subscriptions.js";
+import { crearPagoSuscripcionCatalogo, recuperarServiciosGuardados, SERVICIOS_CATALOGO } from "../src/lib/subscriptions.js";
 
 test("la gráfica sube con ingresos y baja en rojo con gastos", () => {
   const grafica = crearGraficaBalance({
@@ -92,4 +92,22 @@ test("la migración recupera suscripciones exactas de datos y movimientos anteri
   });
   assert.deepEqual(recuperadas.map((servicio) => servicio.nombre), ["ChatGPT", "Amazon Prime", "Google One"]);
   assert.deepEqual(recuperadas.map((servicio) => servicio.diaCobro), [4, 8, 18]);
+});
+
+test("el catálogo permite añadir una suscripción con precio y día personalizados", () => {
+  const chatgpt = SERVICIOS_CATALOGO.find((servicio) => servicio.id === "chatgpt");
+  const pago = crearPagoSuscripcionCatalogo(chatgpt, { importe: "19,99", diaCobro: "21" });
+  assert.deepEqual(pago, {
+    id: "suscripcion-chatgpt",
+    nombre: "ChatGPT",
+    importe: 19.99,
+    diaCobro: 21,
+    categoria: "suscripciones",
+    tipo: "suscripcion",
+    fijo: true,
+    activo: true,
+    color: "#10a37f",
+    sigla: "AI",
+    servicioTipo: "software",
+  });
 });

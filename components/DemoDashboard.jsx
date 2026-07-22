@@ -10,7 +10,7 @@ import { actualizarPagoPrevisto, buscarMovimientoDePago, crearPagosPrevistos, el
 import { crearGraficaBalance } from "../src/lib/balance";
 import { migrarCategoriasRecomendadas } from "../src/lib/categories";
 import { actualizarMovimiento } from "../src/lib/movements";
-import { recuperarServiciosGuardados, SERVICIOS_CATALOGO } from "../src/lib/subscriptions";
+import { crearPagoSuscripcionCatalogo, recuperarServiciosGuardados, SERVICIOS_CATALOGO, TIPOS_SUSCRIPCION } from "../src/lib/subscriptions";
 import {
   ArrowDownRight,
   ArrowLeft,
@@ -929,6 +929,8 @@ function SubscriptionsPage({ language, pagos, categorias, periodo, movimientos, 
   const [editor, setEditor] = useState(null);
   const [error, setError] = useState("");
   const [recuperacion, setRecuperacion] = useState([]);
+  const [busquedaCatalogo, setBusquedaCatalogo] = useState("");
+  const [filtroCatalogo, setFiltroCatalogo] = useState("todas");
   const suscripciones = pagos
     .filter((pago) => pago.tipo === "suscripcion")
     .map((pago) => ({ ...pago, movimiento: buscarMovimientoDePago(pago, movimientos, periodo) }))
@@ -939,6 +941,15 @@ function SubscriptionsPage({ language, pagos, categorias, periodo, movimientos, 
   const totalMensual = activas.reduce((total, pago) => total + Number(pago.importe || 0), 0);
   const periodoFuturo = periodo > periodoActual();
   const totalAnterior = Number(categorias.find((categoria) => categoria.id === "suscripciones")?.limite || 0);
+  const claveServicio = (valor) => String(valor || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const serviciosYaAnadidos = new Set(suscripciones.map((pago) => {
+    const idCatalogo = String(pago.id || "").replace(/^suscripcion-/, "");
+    return SERVICIOS_CATALOGO.some((servicio) => servicio.id === idCatalogo) ? idCatalogo : claveServicio(pago.nombre);
+  }));
+  const serviciosCatalogoVisibles = SERVICIOS_CATALOGO.filter((servicio) =>
+    (filtroCatalogo === "todas" || servicio.tipo === filtroCatalogo) &&
+    claveServicio(servicio.nombre).includes(claveServicio(busquedaCatalogo))
+  );
 
   const alternarRecuperacion = (servicio) => setRecuperacion((actuales) => actuales.some((item) => item.id === servicio.id)
     ? actuales.filter((item) => item.id !== servicio.id)
@@ -967,13 +978,37 @@ function SubscriptionsPage({ language, pagos, categorias, periodo, movimientos, 
 
   const abrirNueva = () => {
     setError("");
-    setEditor({ id: null, nombre: "", importe: "", diaCobro: "1", activo: true, color: "#ef7d4f" });
+    setBusquedaCatalogo("");
+    setFiltroCatalogo("todas");
+    setEditor({ id: null, catalogoId: null, personalizada: false, nombre: "", importe: "", diaCobro: "1", activo: true, color: "#ef7d4f" });
   };
   const abrirEditar = (pago) => {
     setError("");
     setEditor({ ...pago, importe: String(Number(pago.importe || 0)).replace(".", ","), diaCobro: String(pago.diaCobro || 1) });
   };
   const cerrarEditor = () => { setEditor(null); setError(""); };
+
+  const seleccionarDelCatalogo = (servicio) => {
+    if (serviciosYaAnadidos.has(servicio.id) || serviciosYaAnadidos.has(claveServicio(servicio.nombre))) return;
+    setError("");
+    setEditor({
+      id: null,
+      catalogoId: servicio.id,
+      personalizada: false,
+      nombre: servicio.nombre,
+      importe: String(servicio.precio).replace(".", ","),
+      diaCobro: "1",
+      activo: true,
+      color: servicio.color,
+      sigla: servicio.sigla,
+      servicioTipo: servicio.tipo,
+    });
+  };
+
+  const seleccionarPersonalizada = () => {
+    setError("");
+    setEditor({ id: null, catalogoId: null, personalizada: true, nombre: "", importe: "", diaCobro: "1", activo: true, color: "#ef7d4f" });
+  };
 
   const guardar = (event) => {
     event.preventDefault();
@@ -993,11 +1028,17 @@ function SubscriptionsPage({ language, pagos, categorias, periodo, movimientos, 
       fijo: true,
       activo: editor.activo !== false,
       color: editor.color || "#ef7d4f",
-      sigla: nombre.slice(0, 2).toUpperCase(),
+      sigla: editor.sigla || nombre.slice(0, 2).toUpperCase(),
+      servicioTipo: editor.servicioTipo || "personalizada",
     };
+    if (!editor.id && suscripciones.some((pago) => claveServicio(pago.nombre) === claveServicio(nombre))) {
+      return setError(tr("Esta suscripción ya está añadida. Puedes editarla o reactivarla desde su tarjeta.", "This subscription is already added. Edit or reactivate it from its card."));
+    }
+    const servicioCatalogo = editor.catalogoId ? SERVICIOS_CATALOGO.find((servicio) => servicio.id === editor.catalogoId) : null;
+    const nuevaCatalogo = servicioCatalogo ? crearPagoSuscripcionCatalogo(servicioCatalogo, { importe, diaCobro }) : null;
     const siguientes = editor.id
       ? actualizarPagoPrevisto(pagos, editor.id, limpia)
-      : [...pagos, { ...limpia, id: `suscripcion-personalizada-${Date.now()}` }];
+      : [...pagos, nuevaCatalogo || { ...limpia, id: `suscripcion-personalizada-${Date.now()}` }];
     onChange(siguientes);
     onNotify(editor.id ? tr("Suscripción actualizada", "Subscription updated") : tr("Suscripción añadida", "Subscription added"));
     cerrarEditor();
@@ -1084,18 +1125,43 @@ function SubscriptionsPage({ language, pagos, categorias, periodo, movimientos, 
     </section> : <div className="subscriptions-empty"><CreditCard size={30} /><b>{tr("Todavía no tienes suscripciones", "You do not have subscriptions yet")}</b><span>{tr("Las que elijas en el cuestionario aparecerán aquí automáticamente. También puedes añadir una nueva.", "Subscriptions chosen during onboarding appear here automatically. You can also add a new one.")}</span><button onClick={abrirNueva}><Plus size={15} /> {tr("Añadir la primera", "Add your first")}</button></div>}
 
     {editor && <div className="demo-modal-backdrop" onMouseDown={cerrarEditor}>
-      <form className="demo-modal subscription-editor" onSubmit={guardar} onMouseDown={(event) => event.stopPropagation()}>
+      <form className={`demo-modal subscription-editor ${editor.id ? "" : "subscription-picker"}`} onSubmit={guardar} onMouseDown={(event) => event.stopPropagation()}>
         <button type="button" className="demo-modal-close" onClick={cerrarEditor}><X size={18} /></button>
         <span className="demo-modal-icon subscriptions"><CreditCard size={22} /></span>
-        <h2>{editor.id ? tr("Editar suscripción", "Edit subscription") : tr("Nueva suscripción", "New subscription")}</h2>
-        <p>{tr("Indica el importe y el día habitual del cobro.", "Enter the usual amount and billing day.")}</p>
-        <label>{tr("Nombre del servicio", "Service name")}<input autoFocus value={editor.nombre} placeholder={tr("Ej. Amazon Prime", "E.g. Amazon Prime")} onChange={(event) => { setEditor({ ...editor, nombre: event.target.value }); setError(""); }} /></label>
-        <div className="demo-form-row">
+        <h2>{editor.id ? tr("Editar suscripción", "Edit subscription") : tr("Elige una suscripción", "Choose a subscription")}</h2>
+        <p>{editor.id
+          ? tr("Modifica el importe o el día habitual del cobro.", "Change the usual amount or billing day.")
+          : tr("Selecciona un servicio del catálogo. El precio es orientativo y podrás cambiarlo antes de añadirlo.", "Choose a service from the catalog. The suggested price can be changed before adding it.")}</p>
+
+        {!editor.id && <>
+          <div className="subscription-search"><Search size={16} /><input autoFocus value={busquedaCatalogo} onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} onChange={(event) => setBusquedaCatalogo(event.target.value)} placeholder={tr("Buscar Netflix, ChatGPT, iCloud...", "Search Netflix, ChatGPT, iCloud...")} /></div>
+          <div className="subscription-filters">{TIPOS_SUSCRIPCION.map((tipo) => <button type="button" key={tipo.id} className={filtroCatalogo === tipo.id ? "activo" : ""} onClick={() => setFiltroCatalogo(tipo.id)}>{language === "en" ? tipo.name : tipo.nombre}</button>)}</div>
+          <div className="subscription-catalog subscription-picker-catalog">{serviciosCatalogoVisibles.map((servicio) => {
+            const yaAnadida = serviciosYaAnadidos.has(servicio.id) || serviciosYaAnadidos.has(claveServicio(servicio.nombre));
+            const seleccionada = editor.catalogoId === servicio.id;
+            return <article key={servicio.id} className={`${seleccionada ? "activo" : ""} ${yaAnadida ? "ya-anadida" : ""}`}>
+              <button type="button" className="subscription-select" disabled={yaAnadida} onClick={() => seleccionarDelCatalogo(servicio)}>
+                <span style={{ background: servicio.color }}>{servicio.sigla}</span>
+                <div><b>{servicio.nombre}</b><small>{yaAnadida ? tr("Ya añadida", "Already added") : `${euros.format(servicio.precio)} / ${tr("mes", "month")}`}</small></div>
+                {yaAnadida || seleccionada ? <i><Check size={13} /></i> : <Plus size={15} />}
+              </button>
+              {seleccionada && <div className="subscription-details">
+                <label><span>€</span><input aria-label={tr("Importe mensual", "Monthly amount")} inputMode="decimal" value={editor.importe} onChange={(event) => { if (/^\d*[.,]?\d{0,2}$/.test(event.target.value)) { setEditor({ ...editor, importe: event.target.value }); setError(""); } }} /><small>/mes</small></label>
+                <label><small>{tr("Día", "Day")}</small><input aria-label={tr("Día de cobro", "Billing day")} type="number" min="1" max="31" value={editor.diaCobro} onChange={(event) => { setEditor({ ...editor, diaCobro: event.target.value }); setError(""); }} /></label>
+              </div>}
+            </article>;
+          })}</div>
+          {!serviciosCatalogoVisibles.length && <div className="subscriptions-manager-empty">{tr("No encontramos servicios con esa búsqueda.", "No services match that search.")}</div>}
+          <button type="button" className={editor.personalizada ? "subscription-picker-custom activo" : "subscription-picker-custom"} onClick={seleccionarPersonalizada}><Plus size={16} /><span><b>{tr("Otra suscripción", "Another subscription")}</b><small>{tr("Escribe un servicio que no aparezca en el catálogo", "Enter a service that is not in the catalog")}</small></span></button>
+        </>}
+
+        {(editor.id || editor.personalizada) && <label className="subscription-editor-name">{tr("Nombre del servicio", "Service name")}<input autoFocus={Boolean(editor.id)} value={editor.nombre} placeholder={tr("Ej. Mi suscripción", "E.g. My subscription")} onChange={(event) => { setEditor({ ...editor, nombre: event.target.value }); setError(""); }} /></label>}
+        {(editor.id || editor.personalizada) && <div className="demo-form-row">
           <label>{tr("Importe mensual", "Monthly amount")}<input inputMode="decimal" value={editor.importe} placeholder="0,00" onChange={(event) => { if (/^\d*[.,]?\d{0,2}$/.test(event.target.value)) { setEditor({ ...editor, importe: event.target.value }); setError(""); } }} /></label>
           <label>{tr("Día de cobro", "Billing day")}<input type="number" min="1" max="31" value={editor.diaCobro} onChange={(event) => { setEditor({ ...editor, diaCobro: event.target.value }); setError(""); }} /></label>
-        </div>
+        </div>}
         {error && <div className="demo-form-error"><CircleHelp size={15} /> {error}</div>}
-        <button className="demo-modal-submit" type="submit">{editor.id ? tr("Guardar cambios", "Save changes") : tr("Añadir suscripción", "Add subscription")}</button>
+        <button className="demo-modal-submit" type="submit" disabled={!editor.id && !editor.catalogoId && !editor.personalizada}>{editor.id ? tr("Guardar cambios", "Save changes") : editor.catalogoId ? tr(`Añadir ${editor.nombre}`, `Add ${editor.nombre}`) : tr("Añadir suscripción", "Add subscription")}</button>
       </form>
     </div>}
   </section>;

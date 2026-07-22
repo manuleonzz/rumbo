@@ -22,6 +22,34 @@ export const SERVICIOS_CATALOGO = [
   { id: "audible", nombre: "Audible", precio: 9.99, sigla: "Au", color: "#f7991c", tipo: "musica" },
 ];
 
+export const TIPOS_SUSCRIPCION = [
+  { id: "todas", nombre: "Todas", name: "All" },
+  { id: "video", nombre: "Vídeo", name: "Video" },
+  { id: "musica", nombre: "Música", name: "Music" },
+  { id: "gaming", nombre: "Videojuegos", name: "Gaming" },
+  { id: "software", nombre: "Nube y software", name: "Cloud & software" },
+  { id: "bienestar", nombre: "Bienestar", name: "Wellness" },
+];
+
+export function crearPagoSuscripcionCatalogo(servicio, { importe = servicio?.precio, diaCobro = 1 } = {}) {
+  const precio = Number(String(importe).replace(",", "."));
+  const dia = Number(diaCobro);
+  if (!servicio?.id || !String(servicio.nombre || "").trim() || !Number.isFinite(precio) || precio <= 0 || !Number.isInteger(dia) || dia < 1 || dia > 31) return null;
+  return {
+    id: `suscripcion-${servicio.id}`,
+    nombre: String(servicio.nombre).trim(),
+    importe: precio,
+    diaCobro: dia,
+    categoria: "suscripciones",
+    tipo: "suscripcion",
+    fijo: true,
+    activo: true,
+    color: servicio.color || "#ef7d4f",
+    sigla: servicio.sigla || String(servicio.nombre).trim().slice(0, 2).toUpperCase(),
+    servicioTipo: servicio.tipo || "personalizada",
+  };
+}
+
 function claveNombre(valor) {
   return String(valor || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 }

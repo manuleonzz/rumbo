@@ -320,6 +320,13 @@ html[data-theme="dark"] .subscription-check>span { border-color:#496075;backgrou
 html[data-theme="dark"] .subscription-check.activo { border-color:#2f6e5d;background:#17332d;color:#7be0c1; }
 html[data-theme="dark"] .subscription-card-actions>button:hover { border-color:#566abf;background:#233250;color:#b9c5ff; }
 html[data-theme="dark"] .subscription-card-actions>button.delete:hover { border-color:#754452;background:#482a35;color:#ff9ca8; }
+html[data-theme="dark"] .subscription-picker-catalog article.ya-anadida { border-color:#445264;background:#1a2737; }
+html[data-theme="dark"] .subscription-picker-custom { border-color:var(--dark-border);background:var(--dark-field);color:#9babbc; }
+html[data-theme="dark"] .subscription-picker-custom b { color:var(--dark-text); }
+html[data-theme="dark"] .subscription-picker-custom small { color:#93a4b7; }
+html[data-theme="dark"] .subscription-picker-custom:hover,
+html[data-theme="dark"] .subscription-picker-custom.activo { border-color:#a96349;background:#38271f;color:#ff9b74; }
+html[data-theme="dark"] .subscription-picker-custom.activo b { color:#ffb08f; }
 
 /* Dashboard: modal close buttons and disabled actions */
 html[data-theme="dark"] .income-close,
